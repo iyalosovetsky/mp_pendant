@@ -843,6 +843,7 @@ class GrblState(object):
       self.parseState(grblState.strip('\x00').strip())
       # print("MPG ->",grblState,' \n - >> prev ',self.state_prev, self.mpg_prev,' now=>',self.state, self.mpg)
       self.neoLabel(self.grbl_state,id='info')
+      self.neoIcon(text='\n\n\nMPG  ' if self._mpg else '\n\n\nnompg')
       
       if len(self.grbl_info)>0:
          self.neoTerm(self.grbl_info)
@@ -899,11 +900,10 @@ class GrblState(object):
         elif self._jog_arrow[-1:]=='z':  
            color=Z_ARROW_COLOR
         if self._jog_arrow=='':
-           self.neoIcon(text='   ')   
+           self.neoIcon(text='MPG  ' if self._mpg else 'nompg')
         else:
           self.neoIcon(text=('>>>' if self._jog_arrow.startswith('+') else '<<<') +
                        '\n'+('d={0:.1f}'.format(self._dZ) if self._jog_arrow.endswith('z') else 'd={0:.1f}'.format(self._dXY))+
-                       '\nf={0:.0f}'.format(self._feedrate)
                        ,color=color)   
 
 

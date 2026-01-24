@@ -103,4 +103,3 @@ class Dial(DObject):
                 arrow(dev, vor, val, 5, color)
         if isinstance(self.pip, int) and vshort > 5:
             fillcircle(dev, xo, yo, 2, self.pip)
-

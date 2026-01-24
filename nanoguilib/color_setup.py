@@ -92,5 +92,5 @@ gc.collect()  # Precaution before instantiating framebuf
 # Note non-standard MISO pin. This works, verified by SD card.
 spi = SPI(1, 60_000_000, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
 #ssd = SSD(spi, height=320, width=240, disp_mode=0, dc=pdc, cs=pcs, rst=prst)
-ssd = SSD(spi, height=320, width=240, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
+#ssd = SSD(spi, height=320, width=240, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
 ssd = SSD(spi, height=240, width=320, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)

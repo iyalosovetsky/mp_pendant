@@ -18,7 +18,19 @@ from grblUartState import GrblState
 from SmartKbd import SmartKbd
 kbd=SmartKbd()
 
-start_time_cmd = time.time_ns() 
+start_time_cmd = time.time_ns()
+
+from rotaryIRQ import RotaryIRQ
+rot1 = RotaryIRQ(pin_num_dt=27,  
+    pin_num_clk=26,  
+    min_val=0,  
+    reverse=False,  
+    range_mode=RotaryIRQ.RANGE_UNBOUNDED)
+
+ 
+ 
+    
+
 
 DEBUG = False
 
@@ -31,6 +43,11 @@ DEBUG = False
 refresh(ssd, True)
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=True )
+st.set_rotary_obj(rot1)
+rot1.add_listener(st.rotary_listener)
+
+
+    
 kbd.objGrblStateSetter(st)
 
 refresh(ssd)
@@ -40,6 +57,10 @@ term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
 
+#  File "grblUartState.py", line 108, in uart_callback
+#  File "grblUartState.py", line 1099, in procUartInByte
+# File "grblUartState.py", line 111, in uart_callback
+#MemoryError: memory allocation failed, allocating 9042 bytes
 
 
 while True:
@@ -50,7 +71,7 @@ while True:
         
     if st.neo_refresh:
         st.neo_refresh=False
-        refresh(ssd)
+        refresh(ssd)##
         
     proceedCh = term_reader.read()
     if proceedCh is not None and len(proceedCh)>0:
