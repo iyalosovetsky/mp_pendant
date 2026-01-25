@@ -64,6 +64,13 @@ VFD_BG = VFD_BLACK
 GRBL_QUERY_INTERVAL_IDLE = 10000000000  # 10s in nanoseconds
 GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MPG_INTERVAL = 500000000  # 0.5s in nanoseconds
+ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
+POP_CMD_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
+RUN_NOW_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
+PENDANT_READ_INTERVAL =  300000000 # 0.3s in nanoseconds for pop cmd to grbl
+
+
+MAX_BUFFER_SIZE = 200
 
 C_STEP_MAX = 100.0
 C_STEP_MIN = 0.1
@@ -81,16 +88,6 @@ FEED_STEPS=[10.,100.,200.,500.,1000.]
 objgrblState=None
 rx_buffer = b''
 
-#def uart_callback(uart_object):
-#    global rx_buffer
-#    # Read all available bytes from the UART buffer
-#    # It's better to use uart.read() without an argument to get all data at once
-#    # or iterate until uart.any() is 0.
-#    while uart_object.any() > 0:
-#        #byte = uart_object.read(1) # Read a single byte
-#        if byte is not None:
-#            rx_buffer += byte
-
 
 def uart_callback(uart_object):
     global objgrblState
@@ -103,7 +100,7 @@ def uart_callback(uart_object):
         
         if byte_data is not None:
             #print(f"Received byte (bytes object): {byte_data}, Integer value: {byte_value}, Character: {chr(byte_value)}")
-            if (byte_data[0] == 10 or  byte_data[0]==13 or len(rx_buffer)> 1000):
+            if (byte_data[0] == 10 or  byte_data[0]==13 or len(rx_buffer)> MAX_BUFFER_SIZE):  # Newline or carriage return or buffer full):
               if len(rx_buffer)>0:  
                   if objgrblState is not None:
                     try:  
@@ -141,76 +138,120 @@ class NeoLabelObj(object):
         
 
 class GrblState(object):
-    def __init__(self,uart_grbl_mpg,neo,
-                  state:str = '', 
-                  mpg:bool = None,
+    __version__ = '0.1'
+    rt={} # real time tasks
+
+    helpIdx=-1
+    _mX:float = 0.0
+    _mY:float = 0.0
+    _mZ:float = 0.0
+    _mA:float = 0.0
+    _mB:float = 0.0
+    _mC:float = 0.0
+
+    _mX_prev:float = 0.0
+    _mY_prev:float = 0.0
+    _mZ_prev:float = 0.0
+    _mA_prev:float = 0.0
+    _mB_prev:float = 0.0
+    _mC_prev:float = 0.0
+    _mpos_changed:bool  = False
+
+    _mPosInited:bool = False
+    _wX:float = 0.0
+    _wY:float = 0.0
+    _wZ:float = 0.0
+    _dXY:float = DXYZ_STEPS[1]
+    dZ:float = DXYZ_STEPS[1]
+    _feedrate:float =  FEED_STEPS[2]
+    _mpg:bool = None
+    neo = None
+    neo_refresh:bool = False
+
+    debug:bool = DEBUG 
+    _error:str = ''
+    _alarm:str = ''
+    
+    _state:str = 'Idle'
+    _state_prev:str = 'unk'
+    _parse_state_code:str='init'
+    sendedQuery2grblCounter:int = 0
+    
+    _query4MPG_countDown:int = 10
+    # time2query:int = time.time_ns()
+    # MPG_time2query:int = time.time_ns()
+    # timeDelta2query:int = GRBL_QUERY_INTERVAL_IDLE
+    _state_is_changed:bool = False
+    _state_time_change:int = time.time_ns()
+    grbl_display_state:str = '' # text in chevron
+    grbl_info:str = '' # text in bracket
+    _grblExecProgress:str = 'init'
+    # gotQuery:bool = False
+
+
+
+
+    
+    _mpg_prev:str = ''
+    uartInNewData:int = -1
+    bufferUartIn=['','','',''] #
+    bufferUartPos:int = 0
+    bufferUartPrev:int = 0
+    rotaryObj=[{'obj':None ,'axe':'x','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 },
+               {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 }]
+
+
+    editCmd:str = ''
+    # statetext:str = ''
+    # prev_statetext:str  = ''
+    grblCmd2send=[]
+    grblCmdHist=[]
+    grblCmd2HistPos:int = 0
+    term_line_from:int = 1
+    term_pos_from:int = 0
+
+    _jog_arrow:str = ''
+
+    
+
+
+    
+    def __init__(self,uart_grbl_mpg,
+                  neo,
                   debug:bool = DEBUG,
-                  mX:float = 0.0,
-                  mY:float = 0.0,
-                  mZ:float = 0.0,
-                  mA:float = 0.0,
-                  mB:float = 0.0,
-                  mC:float = 0.0,
-                  wX:float = 0.0,
-                  wY:float = 0.0,
-                  wZ:float = 0.0,
-                  dXY:float = DXYZ_STEPS[1],
-                  dZ:float = DXYZ_STEPS[1],
-                  feedrate =  FEED_STEPS[2]
                   ) :
-        self.__version__ = '0.1'
-        self._state = state
-        self._state_prev = ''
-        DEBUG = debug
+        global objgrblState
+        objgrblState=self
+        self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
+        self.rt['query4MPG'] = {'last_start': time.time_ns (), 'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
+        self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
+        self.rt['autoQuery2grbl'] = {'last_start': time.time_ns (), 'interval': GRBL_QUERY_INTERVAL_IDLE, 'proc': self.autoQuery2grbl , 'last_error': 0}
+        
+        # if st.need_query:
+    #     st.send2grblOne('?') # get status from grbl cnc machine    
+
+
+
         self.debug = debug
         
+        self.neo = neo
+        #uarIn
+        self.uart_grbl_mpg = uart_grbl_mpg
+        
 
 
 
         
-        self._error = ''
-        self._alarm = ''
-        self._need_query = True
-        self.gotQuery = False
+        
+       
        
 
         self.query_now('init2')
-        self._query4MPG_countDown = 10
-        self.time2query = time.time_ns()
-        self.MPG_time2query = time.time_ns()
-        self.timeDelta2query = GRBL_QUERY_INTERVAL_IDLE
-        self._mpg = mpg
-        self._mpg_prev = ''
-        self._mX = mX
-        self._mY = mY
-        self._mZ = mZ
-        self._mA = mA
-        self._mB = mB
-        self._mC = mC
+        # self.time2query = time.time_ns()
+        # self.MPG_time2query = time.time_ns()
         
-        self._wX = wX
-        self._wY = wY
-        self._wZ = wZ
-        self._dXY = dXY
-        self._dZ = dZ
-        self._feedrate = feedrate
-        self._state_is_changed = False
-        self.grbl_state = '' # text in chevron
-        self.grbl_info = '' # text in bracket
-        self._execProgress = 'ok'
-        
-        #uarIn
-        self.uart_grbl_mpg = uart_grbl_mpg
-        self.uartInNewData=-1
-        self.bufferUartIn=['','','',''] #
-        self.bufferUartPos=0
-        self.bufferUartPrev=0
-        global objgrblState
-        objgrblState=self
-        # Set up the interrupt handler
-        # Use UART.IRQ_RXIDLE or UART.IRQ_RX depending on board availability and requirement
-        # IRQ_RX triggers on each received character (if supported)
-        # IRQ_RXIDLE triggers when the line is idle after receiving at least one character
+
+
 
 
         
@@ -221,29 +262,53 @@ class GrblState(object):
             self.uart_grbl_mpg.irq(handler=uart_callback, trigger=UART.IRQ_RXIDLE, hard=False) # 'hard=False' is often required
        
        
-        self.neo = neo
-        self._jog_arrow = ''
-        self.idleCounter = 0
-        self.editCmd = ''
-        self.statetext = ''
-        self._state_code='init'
-        self.prev_statetext  = ''
-        self.grblCmd2send=[]
-        self.grblCmdHist=[]
-        self.grblCmd2HistPos = 0
-        self.term_line_from=1
-        self.term_pos_from=0
-        self.neo_refresh= False
-        self._state_time_change = time.time_ns()
+        self.neoInit()
+        
+
+        #self.hello()
+        
+    #main real time loop
+    def p_RTLoop(self):
+        for key, value in self.rt.items ():
+            l_time = time.time_ns ()
+            l_timeprev = value['last_start']
+            if value['proc'] is not None:
+                if (((l_time - l_timeprev) > value['interval'])) :
+                    value['last_start'] = l_time
+                    try:  
+                        value['last_error'] = value['proc'] ()
+                        if value['last_error'] is None:
+                            value['last_error'] = 0
+                    except Exception as e:
+                        value['last_error'] = -97
+                        print ('error rt ' + key, e)
+    # real time task to set last_start to now to run immediately
+    def p_RTSetRunNow(self,id:str):
+        if id in self.rt:
+            if self.rt[id]['interval'] > RUN_NOW_INTERVAL:
+              self.rt[id]['last_start'] = time.time_ns() - (self.rt[id]['interval'] - RUN_NOW_INTERVAL)
+            else:
+               self.rt[id]['last_start'] = time.time_ns() - int(self.rt[id]['interval']*.95)
+    
+    # real time task to set new interval
+    def p_RTSetNewInterval(self,id:str,interval:int):
+        if id in self.rt:
+          if self.rt[id]['interval'] != interval:
+            self.rt[id]['interval'] = interval
+
+
+
+    # initialize neo display labels
+    def neoInit(self):
         self._msg_conf = [
-            ('x', '     '        , VFD_RED,       170,  25, 3,126), #9*14
-            ('y', '     '          , VFD_YELLOW,  170,  65, 3,126),
-            ('z', '     '         , VFD_LBLUE,    170,  105, 3,126),
-            ('cmd', '     '      , VFD_WHITE,       0, 170, 2,308),  #14*22
-            ('state', '     '    , VFD_WHITE,     190, 10, 2,310-190),
-            ('icon', 'grbl',      VFD_PURPLE,       0,  0, 4,100),
-            ('term', '\nF1\nHelp', VFD_YELLOW,      0,  40, 2,160),
-            ('info', 'info'      , VFD_YELLOW,      0, 195, 1,306) #6*51
+            ('x', '     '        , VFD_RED   ,  170,  25, 3,126), #9*14
+            ('y', '     '        , VFD_YELLOW,  170,  65, 3,126),
+            ('z', '     '        , VFD_LBLUE ,  170, 105, 3,126),
+            ('cmd', '     '      , VFD_WHITE ,    0, 170, 2,308),  #14*22
+            ('state', '     '    , VFD_WHITE ,  190,  10, 2,310-190),
+            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 4,100),
+            ('term', '\nF1\nHelp', VFD_YELLOW,    0,  40, 2,160),
+            ('info', 'info'      , VFD_YELLOW,    0, 195, 1,306) #6*51
         ]
         
         self.labels = {}  # dictionary of configured messages_labels
@@ -269,13 +334,12 @@ class GrblState(object):
            '! feed',
            '? query'
         ]     
-        self.helpIdx=-1
-        wriNowrap = CWriter(neo, fixed, verbose=self.debug)
+        wriNowrap = CWriter(self.neo, fixed, verbose=self.debug)
         wriNowrap.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
-        wriNowrapArial = CWriter(neo, arial10, verbose=self.debug)
+        wriNowrapArial = CWriter(self.neo, arial10, verbose=self.debug)
         wriNowrapArial.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
         
-        wriWrap = CWriter(neo, fixed, verbose=self.debug)
+        wriWrap = CWriter(self.neo, fixed, verbose=self.debug)
         wriWrap.set_clip(False, False, True) #row_clip=None, col_clip=None, wrap=None
         
         for c1 in self._msg_conf:
@@ -316,21 +380,21 @@ class GrblState(object):
               else:    
                 ll.value(name,fgcolor=color)
               self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=width,oneWidth=wriWrap.stringlen('0'))
-
+       
         self.neo_refresh= True
-        #self.hello()
-        
 
+    # ui terminal line position decrease
     def decTermLinePos(self):
        if len(self.grbl_info)>0 and self.term_line_from>3:
           self.term_line_from -= 3
 
+    # ui terminal position decrease
     def decTermPos(self):
        if len(self.grbl_info)>0 and self.term_pos_from>4:
           self.term_pos_from -= 5
 
 
-
+    # ui terminal line position increase
     def incTermLinePos(self):
         if len(self.grbl_info)>0:
           lines = self.grbl_info.count('\n')  
@@ -338,17 +402,19 @@ class GrblState(object):
           if self.term_line_from<lines:
              self.term_line_from += 3
 
+    # ui terminal position increase
     def incTermPos(self):
         if len(self.grbl_info)>0:
           if self.term_pos_from<50:
              self.term_pos_from += 5
 
+    # ui terminal position home
     def homeTermPos(self):
         if len(self.grbl_info)>0:
            self.term_pos_from = 0
            self.term_line_from = 1
 
-
+    # ui terminal text splitter for terminal window
     def neoSplitTerm(self,text):
       textF=''
       ii=0
@@ -368,7 +434,7 @@ class GrblState(object):
          textF +=cc.replace('[ALARMCODE:','').replace('[SETTING:','')[self.term_pos_from:25+self.term_pos_from]
       return textF 
     
-    
+    # ui info text splitter for terminal window
     def neoSplitLine(self,text):
       textF=''
       len1 =0
@@ -396,7 +462,7 @@ class GrblState(object):
             textF +='|'+cc
       return textF
             
-        
+    # draw/update neo display label    
     def neoDraw(self,id):
         if id is not None:
             if DEBUG:
@@ -419,7 +485,7 @@ class GrblState(object):
         #self.WHITE =   0xffff
         #self.BLACK =   0x0000            
             
-
+    # ui label`s updater
     def neoLabel(self,text,id='info',color=None):
         if color is not None and isinstance(color,str):
            if color.lower() == 'red':
@@ -611,20 +677,24 @@ class GrblState(object):
     def mpgCommand(self, command:str):
       if DEBUG or (command is not None and command!='' and not command.startswith('?')) :
         print("mpgCommand:",command)
-
-      if not( command.startswith('?') or command.startswith('!') or command.startswith('$') or command.startswith('$')):
-        self._execProgress='do'  
+      if command.startswith('$J=') :
+        self._grblExecProgress='do'  
+      elif not( command.startswith('?') or command.startswith('!') or command.startswith('$') ):
+        self._grblExecProgress='do'  
       self.uart_grbl_mpg.write(command.encode())
+
       if not command.startswith('?'):
           self.query_now('mpgCommand')
-      if not command.startswith('?'):
-        self.idleCounter = 0
+          self.sendedQuery2grblCounter = 0
 
     #jog $J=G91 X0 Y-5 F600
     #$J=G91 X1 F100000
 
-    def grblJog(self, x:float=0.0, y: float=0.0, z:float=0.0):
-      f=self.feedrate
+    def grblJog(self, x:float=0.0, y: float=0.0, z:float=0.0, feedrate:float=None):
+      if feedrate is None:
+         f=self.feedrate
+      else:
+         f=feedrate   
       cmd=''
       if x is not None and x!=0.0:
         self.set_jog_arrow(('+' if x>0 else '-')+'x')
@@ -639,11 +709,12 @@ class GrblState(object):
       if cmd !='':
           self.neoLabel(cmd,id='cmd')  
           self.mpgCommand(cmd+'\r\n')
-          self.query_now('grblJog')
-          if self.timeDelta2query != GRBL_QUERY_INTERVAL_RUN:
-              self.timeDelta2query = GRBL_QUERY_INTERVAL_RUN
-          if self.time2query > time.time_ns()+self.timeDelta2query:
-              self.time2query = time.time_ns()+self.timeDelta2query
+          # self.query_now('grblJog') that is not needed, jog command returns status itself
+          self.p_RTSetNewInterval('autoQuery2grbl',GRBL_QUERY_INTERVAL_RUN)
+          # if self.timeDelta2query != GRBL_QUERY_INTERVAL_RUN:
+          #     self.timeDelta2query = GRBL_QUERY_INTERVAL_RUN
+          # if self.time2query > time.time_ns()+self.timeDelta2query:
+          #     self.time2query = time.time_ns()+self.timeDelta2query
           
           self.neoDisplayJog() 
     
@@ -655,9 +726,10 @@ class GrblState(object):
 
     def query4MPG(self):
         #print('point2/0',self._query4MPG_countDown,self._mpg, self.MPG_time2query , time.time_ns(),self.MPG_time2query > time.time_ns()+MPG_INTERVAL)
-        if (self._mpg is None or self._mpg==0) and self._query4MPG_countDown>0 and self.MPG_time2query < time.time_ns()+MPG_INTERVAL:
+        # if (self._mpg is None or self._mpg==0) and self._query4MPG_countDown>0 and self.MPG_time2query < time.time_ns()+MPG_INTERVAL:
+        if (self._mpg is None or self._mpg==0) and self._query4MPG_countDown>0 :
            print('point2')
-           self.MPG_time2query=time.time_ns()
+           #  self.MPG_time2query=time.time_ns()
            self._query4MPG_countDown -= 1
            self.toggleMPG()
            
@@ -672,16 +744,15 @@ class GrblState(object):
         #self.flashKbdLEDs(LED_ALL , BLINK_2) ##7 - 3 leds       # 1 - macro1
         self.mpgCommand(command)
         if command !='?':
-          self.idleCounter = 0
+          self.sendedQuery2grblCounter = 0
           self.neoLabel(command,id='cmd')
         else:
-          self.gotQuery=True  
           if self.editCmd!='':
             self.grblCmd2send=[]
           else: 
-             self.idleCounter+=1
-             if  self.idleCounter>10:
-                self.idleCounter = 0
+             self.sendedQuery2grblCounter+=1
+             if  self.sendedQuery2grblCounter>10:
+                self.sendedQuery2grblCounter = 0
                 self.neoLabel('',id='cmd')
       elif command=='-y':
           self.grblJog(y=-self.step)
@@ -785,12 +856,8 @@ class GrblState(object):
             self.neoLabel(command,id='cmd')
             self.uart_grbl_mpg.write(command.encode()+b'\r\n')
             if not(command.startswith('?') or command.startswith('!') or command.startswith('$') or command.startswith('$') or command.startswith('#')):
-                self._execProgress='do'
-                if self.timeDelta2query != GRBL_QUERY_INTERVAL_RUN:
-                  self.timeDelta2query = GRBL_QUERY_INTERVAL_RUN
-                if self.time2query > time.time_ns()+self.timeDelta2query:
-                  self.time2query = time.time_ns()+self.timeDelta2query
-
+                self._grblExecProgress='do'
+                self.p_RTSetNewInterval('popCmd2grbl',GRBL_QUERY_INTERVAL_RUN)
 
             cnt=0
             for cc in self.grblCmdHist:
@@ -809,21 +876,33 @@ class GrblState(object):
       #if DEBUG or (command is not None and command!='' and not command.startswith('?')) :
       #  print('send2grbl:',command,' queueLen=',len(self.grblCmd2send), self._execProgress)
       self.grblCmd2send.append(command)
-      if self._execProgress!='do':
+      if self._grblExecProgress!='do':
           self.popCmd2grbl()
 
     def popCmd2grbl(self):
       if len(self.grblCmd2send)>0:
         l_cmd=self.grblCmd2send[0]
-        if self._execProgress == 'do' and (
+        if self._grblExecProgress == 'do' and (
           l_cmd=='-y' or l_cmd=='+y' or 
           l_cmd=='-x' or l_cmd=='+x' or 
           l_cmd=='-z' or l_cmd=='+z' ):
-          print('popCmd2grbl: busy', self._execProgress, l_cmd )
+          print('popCmd2grbl: busy', self._grblExecProgress, l_cmd )
           return
         else:
           l_cmd=self.grblCmd2send.pop(0)
           self.send2grblOne(l_cmd)
+
+    def autoQuery2grbl(self):
+        # self.gotQuery=True
+        self.send2grblOne('?') # get status from grbl cnc machine          
+
+    def query_now(self, parent):
+        if self.debug:
+            print('query_now',parent)
+        #self._need_query = True    
+        # self.gotQuery = False
+        self.p_RTSetRunNow('autoQuery2grbl')
+
 
     def getHist(self, diff=1):
           if len(self.grblCmdHist)>0:
@@ -839,24 +918,20 @@ class GrblState(object):
         return self._feedrate  
     
     
-    def query_now(self, partent):
-        if self.debug:
-            print('query_now',partent)
-        self.gotQuery = False
        
-    @property
-    def need_query(self):
-        # l_nq = self._need_query or time.time_ns()-self.start_time_q>GRBL_QUERY_INTERVAL
-        #l_nq = self._need_query or time.time_ns()>self.time2query
-        l_nq = self._need_query or (time.time_ns()>self.time2query)
-        #print('l_nq=',l_nq,self.time2query > time.time_ns(),self.time2query , time.time_ns())
-        if l_nq:
-          if self.gotQuery:
-              if time.time_ns()>self.time2query:
-                  self.time2query = time.time_ns()+self.timeDelta2query
-              self.gotQuery=False
-              self._need_query = False
-        return l_nq
+    # @property
+    # def need_query(self):
+    #     # l_nq = self._need_query or time.time_ns()-self.start_time_q>GRBL_QUERY_INTERVAL
+    #     #l_nq = self._need_query or time.time_ns()>self.time2query
+    #     l_nq = self._need_query or (time.time_ns()>self.time2query)
+    #     #print('l_nq=',l_nq,self.time2query > time.time_ns(),self.time2query , time.time_ns())
+    #     if l_nq:
+    #       if self.gotQuery:
+    #           if time.time_ns()>self.time2query:
+    #               self.time2query = time.time_ns()+self.timeDelta2query
+    #           self.gotQuery=False
+    #           self._need_query = False
+    #     return l_nq
 
 
     @property
@@ -889,65 +964,52 @@ class GrblState(object):
         
             
     #MPG -> <Idle|MPos:30.000,0.000,0.000|Bf:35,1023|FS:0,0,0|Pn:HS|WCO:0.000,0.000,0.000|WCS:G54|A:|Sc:|MPG:1|H:0|T:0|TLR:0|Sl:0.0|FW:grblHAL>
-    def parseState(self,grblState:str):
+    def parseStateOne(self,lineStateIn:str):
       try:
         ii=0
         token =''
-        if grblState is None:
-          self._state_code='empty'
+        if lineStateIn is None:
+          self._parse_state_code='empty'
           return
-        grblState=grblState.strip()
+        lineStateIn=lineStateIn.strip()
            
-        
-
 
 
         #print('grblState IN ',grblState,']]]]]]]]]]]]]',grblState.find('error:'))  
-        grblState=grblState.replace('ok','').replace('\n','').replace('\r','')
-        self._state_code='parse'
-        if grblState.find('error:')>=0:
-          print('ERRor',grblState,']]]]]]]]]]]]]')  
-          self._execProgress='error'
-          self._state=grblState
-          self._state_is_changed = (self._state_prev is None or  self._state_prev != self._state)
-          self._state_prev = self._state
-          self._state_time_change = time.time_ns()
-          self._state_code='error'
+        #grblState=grblState.replace('ok','').replace('\n','').replace('\r','')
+        self._parse_state_code='parse'
+        if lineStateIn.startswith('ok'):
+          #print('OKKor',lineStateIn,']]]]]]]]]]]]]','prev:', self._grblExecProgress)  
+          if self._grblExecProgress=='do':
+             self._grblExecProgress='doing'
+          elif self._grblExecProgress=='doing':
+             pass
+          else:  
+            self._grblExecProgress='ok'
+          self.changeState('ok')
+          self._parse_state_code='done'
           return        
-        elif grblState.find('alarm:')>=0:
-          print('ALarm',grblState,']]]]]]]]]]]]]')  
-          self._execProgress='alarm'
-          self._state=grblState
-          self._state_is_changed = (self._state_prev is None or  self._state_prev != self._state)
-          self._state_prev = self._state
-          self._state_time_change = time.time_ns()
-          self._state_code='alarm'
-          return        
-        elif grblState.find('<')>=0 and grblState.find('>')>=0 and  grblState.find('<')<grblState.find('>')>=0 :
-            self.grbl_state = grblState[grblState.find('<')+1:grblState.find('>')]
-            for ii,token in enumerate(self.grbl_state.lower().split('|')):
-                if ii==0 :
-                  prv = self._state_prev
-                  self._state_prev = self._state
-                  self._state = token
-                  self._state_is_changed = (prv is None or  prv != self._state)
-                  if self._execProgress=='do' and (self._state.startswith('idle') or self._state.startswith('alarm')) :
-                     self._execProgress='done'
-                     self.time2query = time.time_ns()+self.timeDelta2query
-                    
-                  if (self._state.startswith('run') or self._state.startswith('jog')) :
-                      if self.timeDelta2query != GRBL_QUERY_INTERVAL_RUN:
-                          self.timeDelta2query = GRBL_QUERY_INTERVAL_RUN
-                      if self.time2query > time.time_ns()+self.timeDelta2query:
-                          self.time2query = time.time_ns()+self.timeDelta2query
-                      
-                  elif  self._state_is_changed :
-                      self.time2query = time.time_ns()+GRBL_QUERY_INTERVAL_RUN
-                  elif not (self._state.startswith('run') or self._state.startswith('jog')) :
-                      self.timeDelta2query = GRBL_QUERY_INTERVAL_IDLE
-          
+        elif lineStateIn.startswith('alarm:'):
+          print('ALarm',lineStateIn,']]]]]]]]]]]]]')  
+          self._grblExecProgress='alarm'
+          self.changeState('alarm')
+          self._parse_state_code='done'
+          return  
+        elif lineStateIn.startswith('error:'):
+          print('ERRor',lineStateIn,']]]]]]]]]]]]]')  
+          self._grblExecProgress='error'
+          self.changeState('error')
+          self._parse_state_code='done'
+          return          
+        # general purpose state parsing      
+        elif lineStateIn.find('<')>=0 and lineStateIn.find('>')>=0 and  lineStateIn.find('<')<lineStateIn.find('>')>=0 :
+            self.grbl_display_state = lineStateIn[lineStateIn.find('<'):lineStateIn.find('>')+1]
 
-                  
+            l_state = None 
+
+            for ii,token in enumerate(self.grbl_display_state[1:-1].lower().split('|')):
+                if ii==0 : # state the first token
+                  l_state = token
                 else:
                     elem = token.split(':')
                     if len(elem)>1 and elem[0]=='mpg' and elem[1] is not None and (elem[1]=='1' or elem[1]=='0'):
@@ -958,54 +1020,30 @@ class GrblState(object):
                             self._query4MPG_countDown = 0
                         
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
-                        xyz = elem[1].split(',')
-                        #print('xyz',xyz)
-                        if len(xyz)==3:
-                          self._mX, self._mY,self._mZ = [ float(xx) for xx in xyz ]
-                        elif len(xyz)==4:
-                          self._mX, self._mY,self._mZ,self._mA = [ float(xx) for xx in xyz ]  
-                        elif len(xyz)==5:
-                          self._mX, self._mY,self._mZ,self._mA,self._mB = [ float(xx) for xx in xyz ]  
-                        elif len(xyz)==6:
-                          self._mX, self._mY,self._mZ,self._mA,self._mB,self._mC = [ float(xx) for xx in xyz ]  
-            self._state_code='done'
+                        self.changeMpos(elem[1].split(','))
+            if l_state is not None:
+                 self.changeState(l_state)            
+            self._parse_state_code='done'
             return
         
-        elif grblState.find('[')>=0 and grblState.find(']')>=0 and  grblState.find('[')<grblState.find(']')>=0 :
-            grblState=grblState[grblState.find('['):grblState.find('[')+1]
-            self.grbl_info=grblState
-            if grblState.count('Unlocked')>0:
-              prv = self._state_prev
-              self._state_prev = self._state
-              self._state = 'unlocked'
-              self._state_is_changed = (prv is None or  prv != self._state)
-              self._execProgress='done'
-            self._state_code='done'  
+        elif lineStateIn.find('[')>=0 and lineStateIn.find(']')>=0 and  lineStateIn.find('[')<lineStateIn.find(']')>=0 :
+            lineStateIn=lineStateIn[lineStateIn.find('['):lineStateIn.find('[')+1]
+            self.grbl_info=lineStateIn
+            if lineStateIn.count('Unlocked')>0:
+              self.changeState('unlocked')
+              self._grblExecProgress='done'
+            self._parse_state_code='done'  
             return
-        elif grblState.startswith('$'):
-          self.grbl_info=grblState
-          self._state_code='done'  
-          return 
-
-           #self.term_line_from=1
-        elif grblState.find('ok'):
-          self._execProgress='ok'
-          self._state='ok'
-          self._state_is_changed = (self._state_prev is None or  self._state_prev != self._state)
-          self._state_prev = self._state
-          self._state_time_change = time.time_ns()
-          self._state_code='done'
-          return
-        elif  grblState.startswith('$')  :
-          self.grbl_info=grblState           
-          self._state_code='done'
+        elif  lineStateIn.startswith('$')  :
+          self.grbl_info=lineStateIn           
+          self._parse_state_code='done'
           return
         else:
-          l_cntNewL=grblState.count('\n')
+          l_cntNewL=lineStateIn.count('\n')
           if l_cntNewL>0:
-              if grblState.count('ok')>0:
-                  self._execProgress='ok'
-          self._state_code='done'
+              if lineStateIn.count('ok')>0:
+                  self._grblExecProgress='ok'
+          self._parse_state_code='done'
           return
         
             
@@ -1018,15 +1056,36 @@ class GrblState(object):
 
 
       except:
-          print('error parseState ',grblState, ii, token)
-          self._state_code='fail'  
-                      
+          print('error parseState ',lineStateIn, ii, token)
+          self._parse_state_code='fail'  
+
+    def parseState(self, stateIn:str):
+      for item in stateIn.splitlines():
+        if item.strip()!='':
+          self.parseStateOne(item)
+
+    def changeState(self,newState:str):
+        prv = self._state_prev
+        self._state_prev = self._state
+        self._state = newState
+        self._state_is_changed = (prv is None or  prv != self._state)     
+        self._state_time_change = time.time_ns()
+        if (self._state.startswith('run') or self._state.startswith('jog')) or self._state_is_changed  :
+            self.p_RTSetNewInterval('autoQuery2grbl',GRBL_QUERY_INTERVAL_RUN)
+        elif not (self._state.startswith('run') or self._state.startswith('jog')) :
+            self.p_RTSetNewInterval('autoQuery2grbl',GRBL_QUERY_INTERVAL_IDLE)
+        if self._grblExecProgress in ('do','doing','alarm','error') and (self._state.startswith('idle') or self._state.startswith('alarm')) :
+            self._grblExecProgress='done'
+            # set rotary to initial
+            self.initRotaryMpos()     
+
 
 
     def displayState(self,grblState:str):     
-      self.parseState(grblState.strip('\x00').strip())
+
+      self.parseState(grblState)
       # print("MPG ->",grblState,' \n - >> prev ',self.state_prev, self.mpg_prev,' now=>',self.state, self.mpg)
-      self.neoLabel(self.grbl_state,id='info')
+      self.neoLabel(self.grbl_display_state,id='info')
       
       if len(self.grbl_info)>0:
          self.neoTerm(self.grbl_info)
@@ -1098,7 +1157,7 @@ class GrblState(object):
        self.editCmd=text
 
     def neoShowEdit(self):
-      self.idleCounter = 0
+      self.sendedQuery2grblCounter = 0
       # self.neoIdle()
       self.neoLabel(text=self.editCmd,id='cmd')
       
@@ -1107,9 +1166,7 @@ class GrblState(object):
       # Process the bytes (e.g., print its integer value or character)
       if len(chars)>0:
             if self.debug:
-                print('chars',chars.decode())
-            
-            #print(f"Received byte (bytes object): {byte_data}, Integer value: {byte_value}, Character: {chr(byte_value)}")
+                print(chars.decode())
             self.bufferUartIn[self.bufferUartPos]=chars.decode()
             self.displayState(self.bufferUartIn[self.bufferUartPos])
             self.bufferUartPrev=self.bufferUartPos
@@ -1127,12 +1184,121 @@ class GrblState(object):
                 print(self.bufferUartIn[self.uartInNewData])
             return self.bufferUartIn[self.uartInNewData]
         return None
+    
+
+    
+    
+    # event when grbl pos changed
+    def changeMpos(self, xyz):
+      old_inited= self._mPosInited                        
+      if len(xyz)==3:
+        self._mX_prev, self._mY_prev,self._mZ_prev = (self._mX, self._mY,self._mZ)
+        self._mX, self._mY,self._mZ = [ float(xx) for xx in xyz ]
+        self._mPosInited:bool = True
+      elif len(xyz)==4:
+        self._mX_prev, self._mY_prev,self._mZ_prev,self._mA_prev = (self._mX, self._mY,self._mZ,self._mA)
+        self._mX, self._mY,self._mZ,self._mA = [ float(xx) for xx in xyz ]  
+        self._mPosInited:bool = True
+      elif len(xyz)==5:
+        self._mX_prev, self._mY_prev,self._mZ_prev,self._mA_prev,self._mB_prev = (self._mX, self._mY,self._mZ,self._mA,self._mB)
+        self._mX, self._mY,self._mZ,self._mA,self._mB = [ float(xx) for xx in xyz ]  
+        self._mPosInited:bool = True
+      elif len(xyz)==6:
+        self._mX_prev, self._mY_prev,self._mZ_prev,self._mA_prev,self._mB_prev,self._mC_prev = (self._mX, self._mY,self._mZ,self._mA,self._mB,self._mC)
+        self._mX, self._mY,self._mZ,self._mA,self._mB,self._mC = [ float(xx) for xx in xyz ]  
+        self._mPosInited:bool = True
+
+      self._mpos_changed = (self._mX_prev != self._mX or self._mY_prev != self._mY or self._mZ_prev != self._mZ)
+      if self._mpos_changed:
+         #print('changeMpos:')
+         self.initRotaryMpos()
+
+    def initRotaryMpos(self):
+        if self._mPosInited: # set rotary mpos only at first time 
+          for rotObj  in self.rotaryObj:  
+            if rotObj['obj'] is not None:
+                rotObj['mpos'] = (self._mX if rotObj['axe']=='x' else ( self._mY if rotObj['axe']=='y' else self._mZ ))
+                rotObj['rotary_on_mpos'] = rotObj['obj'].value()
+                rotObj['value_prev'] = rotObj['obj'].value()
+                rotObj['value'] = rotObj['obj'].value()
+                rotObj['nanosec'] = time.time_ns()
+                rotObj['nanosec_prev'] = rotObj['nanosec']
         
+    # link with rotary encoder  object
+    def set_rotary_obj(self,rotaryObj,rotN,axe,unit):
+        self.rotaryObj[rotN]={'obj':rotaryObj ,'axe':axe,'unit':unit, 
+                              'state':self.state,
+                              'value':rotaryObj.value(),
+                              'value_prev':rotaryObj.value(),
+                              'mpos':self._mX if axe=='x' else ( self._mY if axe=='y' else self._mZ ),
+                              'nanosec':time.time_ns(), 
+                              'nanosec_prev':time.time_ns(), 
+                              'rotary_on_mpos':None,
+                              'scale':1.0
+                                }
+
+
+
+    def rotary_listener(self,rotN):
+        if self.rotaryObj[rotN]['obj'] is not None:
+            self.rotaryObj[rotN]['value_prev']=self.rotaryObj[rotN]['value']
+            self.rotaryObj[rotN]['value']=self.rotaryObj[rotN]['obj'].value()
+            self.rotaryObj[rotN]['nanosec_prev']=self.rotaryObj[rotN]['nanosec']
+            self.rotaryObj[rotN]['nanosec']=time.time_ns()
+            # if self._mPosInited:
+            # if self.rotaryObj[rotN]['nanosec_prev']-self.rotaryObj[rotN]['nanosec']>1000000: #
+                    # self.rotaryObj[rotN]['rotary_on_mpos']=self.rotaryObj[rotN]['value']
+                # print ('rotary_listener: #',rotN,self.rotaryObj[rotN]['axe'],self.rotaryObj[rotN]['value'],self.rotaryObj[rotN]['mpos'])
+                # print ('              delta:', self.rotaryObj[rotN]['value']- self.rotaryObj[rotN]['rotary_on_mpos']  )
+
+
+    # callback for rotary 0 (x)
+    def rotary_listener0(self):
+        self.rotary_listener(0)
+        
+    # callback for rotary 1 (y)    
+    def rotary_listener1(self):
+        self.rotary_listener(1)
+
+    # task every 1s
+    def upd_rotary(self):
+        if self._grblExecProgress in ('do','doing','alarm','error'):
+            return
+        for rotN in range(len(self.rotaryObj)):
+            if self.rotaryObj[rotN]['obj'] is not None:
+                if self._mPosInited and self.rotaryObj[rotN]['state'] not in ('jog','run','planed'):
+                    delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+                    delta_time = self.rotaryObj[rotN]['nanosec'] - self.rotaryObj[rotN]['nanosec_prev']
+                    if delta_val==0 or time.time_ns()-self.rotaryObj[rotN]['nanosec'] < PENDANT_READ_INTERVAL:
+                       #print('upd_rotary: no timeout no movement, skip', rotN, delta_time)
+                       continue
+                    if delta_time>0:
+                        speed = abs(delta_val) / (delta_time / 1_000_000_000)  # units per second
+                    else:
+                        speed = 0
+
+
+                    # self.rotaryObj[rotN]['scale']=scale
+                    #scale = self.rotaryObj[rotN]['scale']
+                    step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
+                    feed = 100.0
+                    if abs(delta_val)>80:
+                        feed = 10000.0
+                    elif abs(delta_val)>50:
+                        feed = 500.0
+                    elif abs(delta_val)>10:
+                       feed = 200.0
+
+                        
+                    # print ('upd_rotary:', rotN, self.rotaryObj[rotN]['axe'], ' feed=', feed, ' speed=',  speed)   
+
+                    if self.rotaryObj[rotN]['axe']=='x':
+                        self.grblJog(x=step, feedrate=feed)
+                    elif self.rotaryObj[rotN]['axe']=='y':
+                        self.grblJog(y=step, feedrate=feed)
+                    elif self.rotaryObj[rotN]['axe']=='z':
+                        self.grblJog(z=step, feedrate=feed)
       
-    def set_rotary_obj(self,rotaryObj):
-        self.rotaryObj=rotaryObj
         
-    def rotary_listener(self):
-        if self.rotaryObj is not None:
-            print ('rotary_listener:',self.rotaryObj.value())
+
 

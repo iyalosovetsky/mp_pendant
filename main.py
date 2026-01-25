@@ -21,7 +21,7 @@ kbd=SmartKbd()
 start_time_cmd = time.time_ns()
 
 from rotaryIRQ import RotaryIRQ
-rot1 = RotaryIRQ(pin_num_dt=27,  
+rot0 = RotaryIRQ(pin_num_dt=27,  
     pin_num_clk=26,  
     min_val=0,  
     reverse=False,  
@@ -42,9 +42,9 @@ DEBUG = False
 
 refresh(ssd, True)
 
-st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=True )
-st.set_rotary_obj(rot1)
-rot1.add_listener(st.rotary_listener)
+st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False )
+st.set_rotary_obj(rot0,0,'x',1.0)
+rot0.add_listener(st.rotary_listener0)
 
 
     
@@ -64,10 +64,10 @@ print('display started')
 
 
 while True:
-    st.query4MPG()
-    #l=st.procUartGetLastData(printEnable=True)
-    if st.need_query:
-        st.send2grblOne('?') # get status from grbl cnc machine    
+    #st.query4MPG()
+    st.p_RTLoop()
+    # if st.need_query:
+    #     st.send2grblOne('?') # get status from grbl cnc machine    
         
     if st.neo_refresh:
         st.neo_refresh=False
@@ -78,9 +78,6 @@ while True:
         if DEBUG:
             print('proceedCh:',proceedCh,[ord(res) for res in proceedCh])
         kbd.proceedChars(proceedCh, False)
-    if time.time_ns()-start_time_cmd>200000000: #0.2s
-        st.popCmd2grbl()
-        start_time_cmd = time.time_ns()  
         
             
     time.sleep(0.1) # Small delay to prevent a hard loop
