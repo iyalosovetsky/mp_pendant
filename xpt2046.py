@@ -14,6 +14,7 @@ LCD_BL   = 13
 LCD_RST  = 15
 TP_CS    = 16
 TP_IRQ   = 17
+SAMPLES = 10
 
 class Touch(object):
     """Serial interface for XPT2046 Touch Screen Controller."""
@@ -29,7 +30,7 @@ class Touch(object):
     GET_AUX = const(0b11100000)  # Auxiliary input to ADC
 
     def __init__(self,  width=320, height=240,
-                 x_min=750, x_max=3400, y_min=430, y_max=3270+430):
+                 x_min=700, x_max=3500, y_min=700, y_max=3500):
         """Initialize touch screen controller.
 
         Args:
@@ -165,7 +166,7 @@ class Touch(object):
             self.cs(0)
             X_Point = 0
             Y_Point = 0
-            for i in range(0,5):
+            for i in range(0,SAMPLES):
                  self.spi.write(bytearray([GET_X]))
                  Read_date = self.spi.read(2)
                  X_Point=X_Point+(((Read_date[0]<<8)+Read_date[1])>>3)
@@ -173,10 +174,9 @@ class Touch(object):
                  self.spi.write(bytearray([GET_Y]))
                  Read_date = self.spi.read(2)
                  Y_Point=Y_Point+(((Read_date[0]<<8)+Read_date[1])>>3)
-                 time.sleep_us(20)
 
-            X_Point=X_Point/5
-            Y_Point=Y_Point/5
+            X_Point=X_Point/SAMPLES
+            Y_Point=Y_Point/SAMPLES
 
 #   threshold: 400
 #   transform:

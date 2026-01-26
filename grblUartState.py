@@ -128,7 +128,8 @@ class NeoLabelObj(object):
         self.scale= scale
         self.color= color
         self.label= label
-        self.width= width
+        self.width= self.label.width
+        self.height= self.label.height
         self.oneWidth= oneWidth
         self.charsl=5
         if self.width is not None and self.oneWidth is not None and self.oneWidth>0 and self.width>0 :
@@ -162,7 +163,7 @@ class GrblState(object):
     _wY:float = 0.0
     _wZ:float = 0.0
     _dXY:float = DXYZ_STEPS[1]
-    dZ:float = DXYZ_STEPS[1]
+    _dZ:float = DXYZ_STEPS[1]
     _feedrate:float =  FEED_STEPS[2]
     _mpg:bool = None
     neo = None
@@ -357,7 +358,8 @@ class GrblState(object):
               fl.value(name.upper(),fgcolor=color)
               ll=Label(wriNowrap, y, x+flw+5, width-flw, bdcolor=None)
               ll.value('{:6.2f}'.format(-123.02), fgcolor=VFD_WHITE)
-              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, width=width-flw-8,oneWidth=wriNowrap.stringlen('0'))
+              
+              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=wriNowrap.stringlen('0'))
             elif name in ('info','state'):
               ll=Label(wriNowrapArial, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
@@ -365,21 +367,21 @@ class GrblState(object):
               else:    
                 ll.value(name,fgcolor=color)
               #self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=width,oneWidth=wriNowrapArial.stringlen('0'))
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=(width//wriNowrapArial.stringlen('0'))*wriNowrapArial.stringlen('0'),oneWidth=wriNowrapArial.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriNowrapArial.stringlen('0'))
             elif name in ('cmd','icon'):
               ll=Label(wriNowrap, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
               else:    
                 ll.value(name)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=width,oneWidth=wriNowrap.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriNowrap.stringlen('0'))
             else: #term etc
               ll=Label(wriWrap, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
               else:    
                 ll.value(name,fgcolor=color)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=width,oneWidth=wriWrap.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriWrap.stringlen('0'))
        
         self.neo_refresh= True
 
@@ -506,15 +508,15 @@ class GrblState(object):
         if id=='x':
           self.labels[id].text = '{0:.3f}'.format(self._mX)
           #self.labels[id].color=VFD_ARROW_X
-          self.labels[id].color=VFD_LABEL_X
+          #self.labels[id].color=VFD_LABEL_X
         elif id=='y': 
           self.labels[id].text = '{0:.3f}'.format(self._mY)  
           #self.labels[id].color=VFD_ARROW_Y
-          self.labels[id].color=VFD_LABEL_Y
+          #self.labels[id].color=VFD_LABEL_Y
         elif id=='z':
           self.labels[id].text = '{0:.3f}'.format(self._mZ)  
           #self.labels[id].color=VFD_ARROW_Z
-          self.labels[id].color=VFD_LABEL_Z
+          #self.labels[id].color=VFD_LABEL_Z
         elif id=='cmd':
           self.labels[id].text = text
           if color is None:
@@ -1077,7 +1079,7 @@ class GrblState(object):
             self._grblExecProgress='done'
             # set rotary to initial
             self.initRotaryMpos()     
-
+        self.neo_refresh= True
 
 
     def displayState(self,grblState:str):     
@@ -1211,6 +1213,7 @@ class GrblState(object):
       if self._mpos_changed:
          #print('changeMpos:')
          self.initRotaryMpos()
+         self.neo_refresh= True
 
     def initRotaryMpos(self):
         if self._mPosInited: # set rotary mpos only at first time 
@@ -1299,4 +1302,36 @@ class GrblState(object):
                         self.grblJog(z=step, feedrate=feed)
 
     def touchscreen_press(self,x, y):
-        print('touchscreen_press:',x,y)        
+        print('touchscreen_press:',x,y)  
+        pressed=''
+        for label in self.labels:
+            if label in ('x','y','z'):
+               ll=self.labels[label]
+               print (label,ll.x, ll.y, ll.width, ll.height)
+               if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-ll.height-2 and y<=ll.y+2:
+                   pressed=label
+                   break
+        if pressed!='':       
+          print('  pressed ',pressed) 
+          if self.labels[pressed].color!=VFD_YELLOW:
+             self.labels[pressed].color=VFD_YELLOW
+             self.neo_refresh =True
+             if self.rotaryObj[0]['axe']!=pressed:
+                 self.rotaryObj[0]['axe'] = pressed
+                 self.neoLabel('',id=pressed)
+                 self.initRotaryMpos()
+             if pressed!='x' and self.labels['x'].color!=VFD_LBLUE:
+                self.labels['x'].color=VFD_LBLUE
+                self.neoLabel('',id='x')
+             if pressed!='y' and self.labels['y'].color!=VFD_LBLUE:
+                self.labels['y'].color=VFD_LBLUE
+                self.neoLabel('',id='y')
+             if pressed!='z' and self.labels['z'].color!=VFD_LBLUE:
+                self.labels['z'].color=VFD_LBLUE
+                self.neoLabel('',id='z')
+      
+      
+
+
+               
+                

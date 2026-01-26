@@ -5,3 +5,8 @@ Project used LCD  Pico-ResTouch-LCD-2.8  https://www.waveshare.com/wiki/Pico-Res
 
 nanoguidlib
 https://github.com/peterhinch/micropython-nano-gui
+
+
+https://github.com/peterhinch/micropython-touch/blob/master/TOUCHPAD.md
+
+tpad.init(240, 320, 241, 292, 3866, 3887, True, True, False)
