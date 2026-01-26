@@ -728,7 +728,6 @@ class GrblState(object):
         #print('point2/0',self._query4MPG_countDown,self._mpg, self.MPG_time2query , time.time_ns(),self.MPG_time2query > time.time_ns()+MPG_INTERVAL)
         # if (self._mpg is None or self._mpg==0) and self._query4MPG_countDown>0 and self.MPG_time2query < time.time_ns()+MPG_INTERVAL:
         if (self._mpg is None or self._mpg==0) and self._query4MPG_countDown>0 :
-           print('point2')
            #  self.MPG_time2query=time.time_ns()
            self._query4MPG_countDown -= 1
            self.toggleMPG()
@@ -1298,7 +1297,6 @@ class GrblState(object):
                         self.grblJog(y=step, feedrate=feed)
                     elif self.rotaryObj[rotN]['axe']=='z':
                         self.grblJog(z=step, feedrate=feed)
-      
-        
 
-
+    def touchscreen_press(self,x, y):
+        print('touchscreen_press:',x,y)        

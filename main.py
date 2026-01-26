@@ -1,10 +1,19 @@
 from machine import UART
+import machine
 import time
 import sys
 
 from nanoguilib.color_setup import ssd
 from nanoguilib.nanogui import refresh
 from TermReader import TermReader
+from xpt2046 import Touch
+
+
+print(machine.freq()) 
+# Set CPU to 240 MHz
+machine.freq(240000000)
+# Verify the new frequency
+print(machine.freq()) 
 
 # Initialize UART (adjust parameters for your board/pins)
 # Example for a Raspberry Pi Pico (UART 0 on GP0/GP1)
@@ -55,6 +64,11 @@ refresh(ssd)
 
 term_reader = TermReader(sys.stdin.buffer)
 print('display started')
+
+xpt = Touch()
+xpt.set_int_handler(st.touchscreen_press)
+print('touch initialized')
+
 
 
 #  File "grblUartState.py", line 108, in uart_callback
