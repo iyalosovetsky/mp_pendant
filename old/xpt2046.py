@@ -4,6 +4,9 @@ from micropython import const  # type: ignore
 import time
 from machine import Pin,SPI,PWM
 
+#on ili9488
+#SPI1tx gp11  SPI_MOSI[4](sch) SPI_SDA SDA (Serial Data): Connects to the MCU's hardware SPI MOSI pin (e.g., GPIO 23 on ESP32 or D11 on Uno).
+#SPI1rx gp12  SPI_MISO[3](sch) SPI_SDO SDO (Serial Data Out): SDO (Serial Data Out): Used for reading data back from the display (optional for display-only projects).
 
 LCD_DC   = 8
 LCD_CS   = 9

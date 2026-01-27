@@ -48,7 +48,9 @@ from machine import Pin, SPI
 # Y8    DATA (1 SI MOSI)
 
 from machine import Pin, SPI
-from nanoguilib.st7789_4bit import *
+#from nanoguilib.st7789_4bit import *
+#from nanoguilib.ili9488 import *
+from nanoguilib.ili9488 import ILI9488 as SSD
 #import gc
 
 # *** Choose your color display driver here ***
@@ -80,12 +82,16 @@ import gc
 # from drivers.ssd1351.ssd1351_generic import SSD1351 as SSD
 
 # STM specific driver
-SSD = ST7789
+#SSD = ST7789
+#SSD = ILI9488
+SSD.COLOR_INVERT = 0xFFFF
 
-pdc = Pin(8, Pin.OUT, value=0)
+#pdc = Pin(8, Pin.OUT, value=0)
+pdc = Pin(15, Pin.OUT, value=0)
 pcs = Pin(9, Pin.OUT, value=1)
-prst = Pin(15, Pin.OUT, value=1)
-pbl = Pin(13, Pin.OUT, value=1)
+#prst = Pin(15, Pin.OUT, value=1)
+prst = Pin(8, Pin.OUT, value=1)
+#pbl = Pin(13, Pin.OUT, value=1)
 
 gc.collect()  # Precaution before instantiating framebuf
 # Max baudrate produced by Pico is 31_250_000. ST7789 datasheet allows <= 62.5MHz.
@@ -93,4 +99,5 @@ gc.collect()  # Precaution before instantiating framebuf
 spi = SPI(1, 60_000_000, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
 #ssd = SSD(spi, height=320, width=240, disp_mode=0, dc=pdc, cs=pcs, rst=prst)
 #ssd = SSD(spi, height=320, width=240, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
-ssd = SSD(spi, height=240, width=320, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
+#ssd = SSD(spi, height=240, width=320, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
+ssd = SSD(spi, height=320, width=480,  dc=pdc, cs=pcs, rst=prst)

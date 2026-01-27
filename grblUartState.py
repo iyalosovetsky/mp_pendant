@@ -12,6 +12,7 @@ from nanoguilib.label import Label
 # Fonts
 import nanoguilib.arial10 as arial10
 import nanoguilib.courier20 as fixed
+import nanoguilib.arial35 as arial35
 #import nanoguilib.font6 as small
 
 BLINK_2 = 1
@@ -302,14 +303,14 @@ class GrblState(object):
     # initialize neo display labels
     def neoInit(self):
         self._msg_conf = [
-            ('x', '     '        , VFD_RED   ,  170,  25, 3,126), #9*14
-            ('y', '     '        , VFD_YELLOW,  170,  65, 3,126),
-            ('z', '     '        , VFD_LBLUE ,  170, 105, 3,126),
-            ('cmd', '     '      , VFD_WHITE ,    0, 170, 2,308),  #14*22
+            ('x', '     '        , VFD_RED   ,  270,  35, 3,126), #9*14
+            ('y', '     '        , VFD_YELLOW,  270,  115, 3,126),
+            ('z', '     '        , VFD_LBLUE ,  270, 195, 3,126),
+            ('cmd', '     '      , VFD_WHITE ,    0, 260, 2,308),  #14*22
             ('state', '     '    , VFD_WHITE ,  190,  10, 2,310-190),
-            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 4,100),
+            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 2,100),
             ('term', '\nF1\nHelp', VFD_YELLOW,    0,  40, 2,160),
-            ('info', 'info'      , VFD_YELLOW,    0, 195, 1,306) #6*51
+            ('info', 'info'      , VFD_WHITE,    0, 280, 1,306) #6*51
         ]
         
         self.labels = {}  # dictionary of configured messages_labels
@@ -335,53 +336,50 @@ class GrblState(object):
            '! feed',
            '? query'
         ]     
-        wriNowrap = CWriter(self.neo, fixed, verbose=self.debug)
-        wriNowrap.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
-        wriNowrapArial = CWriter(self.neo, arial10, verbose=self.debug)
-        wriNowrapArial.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
+        # wriNowrap = CWriter(self.neo, fixed, verbose=self.debug)
+        # wriNowrap.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
+        # wriNowrapArial = CWriter(self.neo, arial10, verbose=self.debug)
+        # wriNowrapArial.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
         
-        wriWrap = CWriter(self.neo, fixed, verbose=self.debug)
-        wriWrap.set_clip(False, False, True) #row_clip=None, col_clip=None, wrap=None
+        # writer = CWriter(self.neo, fixed, verbose=self.debug)
+        # writer.set_clip(False, False, True) #row_clip=None, col_clip=None, wrap=None
         
         for c1 in self._msg_conf:
             (name, textline, color, x, y, scale, width) = c1  # unpack tuple into five var names
-            
-            #l_label = label.Label(terminalio.FONT, text=textline, color=color, scale=scale)
-            #l_label={"x":x,"y":y,"text":textline,"color":color,"scale":scale}
-            #l_label.x = x
-            #l_label.y = y
-            #self.labels[name] = l_label
-            #self.neo.display.root_group.append(l_label)
+            fnt=arial35 if scale==3 else (arial10 if scale==1 else fixed)
+            writer = CWriter(self.neo, fnt, verbose=self.debug)
+            writer.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
+
+
             if name in ('xyz'):
-              flw=wriNowrap.stringlen(name)
-              fl=Label(wriNowrap, y, x, flw,fgcolor=color)
-              fl.value(name.upper(),fgcolor=color)
-              ll=Label(wriNowrap, y, x+flw+5, width-flw, bdcolor=None)
-              ll.value('{:6.2f}'.format(-123.02), fgcolor=VFD_WHITE)
+              flw=writer.stringlen(name.upper()+': ')
+              fl=Label(writer, y, x, flw,fgcolor=color)
+              fl.value(name.upper()+': ',fgcolor=color)
+              ll=Label(writer, y, x+flw, writer.stringlen('-999.999'), bdcolor=None)
+              ll.value('{:7.3f}'.format(-123.012), fgcolor=VFD_WHITE)
               
-              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=wriNowrap.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
             elif name in ('info','state'):
-              ll=Label(wriNowrapArial, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
               else:    
                 ll.value(name,fgcolor=color)
-              #self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll, width=width,oneWidth=wriNowrapArial.stringlen('0'))
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriNowrapArial.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('cmd','icon'):
-              ll=Label(wriNowrap, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
               else:    
                 ll.value(name)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriNowrap.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             else: #term etc
-              ll=Label(wriWrap, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
               else:    
                 ll.value(name,fgcolor=color)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=wriWrap.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
        
         self.neo_refresh= True
 

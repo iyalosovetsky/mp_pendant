@@ -6,7 +6,7 @@ import sys
 from nanoguilib.color_setup import ssd
 from nanoguilib.nanogui import refresh
 from TermReader import TermReader
-from xpt2046 import Touch
+from ns2009 import Touch
 
 
 print(machine.freq()) 
@@ -65,8 +65,8 @@ refresh(ssd)
 term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
-xpt = Touch()
-xpt.set_int_handler(st.touchscreen_press)
+ns = Touch()
+ns.set_int_handler(st.touchscreen_press)
 print('touch initialized')
 
 
