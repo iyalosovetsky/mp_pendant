@@ -8,6 +8,7 @@ from machine import UART
 from nanoguilib.writer import CWriter
 from nanoguilib.meter import Meter
 from nanoguilib.label import Label
+from nanoguilib.textbox import Textbox
 
 # Fonts
 import nanoguilib.arial10 as arial10
@@ -122,19 +123,23 @@ def uart_callback(uart_object):
 
 class NeoLabelObj(object):
     def __init__(self, color:int , scale:float,x:int,y:int,text:str = '',label=None,fldLabel=None,
-                 width:int=100,oneWidth:int=20 ):
+                 width:int=100,oneWidth:int=20, nlines:int=1 ):
         self.x= x
         self.y= y
         self.text=  text
         self.scale= scale
         self.color= color
+        self.nlines = nlines  
         self.label= label
         self.width= self.label.width
         self.height= self.label.height
         self.oneWidth= oneWidth
         self.charsl=5
+        self.chars = 5
         if self.width is not None and self.oneWidth is not None and self.oneWidth>0 and self.width>0 :
-          self.charsl=self.width//self.oneWidth + (1 if (self.width%self.oneWidth)>0 else 0)
+          # self.charsl=self.width//self.oneWidth + (1 if (self.width%self.oneWidth)>0 else 0)
+          self.charsl=self.width//self.oneWidth 
+          self.chars =self.charsl * self.nlines
         
         self.fldLabel = fldLabel
         
@@ -160,15 +165,33 @@ class GrblState(object):
     _mpos_changed:bool  = False
 
     _mPosInited:bool = False
+    #work coordinate offset (WCO). Used to calculate WPos from MPos 
     _wX:float = 0.0
     _wY:float = 0.0
     _wZ:float = 0.0
+    _wA:float = 0.0
+    _wB:float = 0.0
+    _wC:float = 0.0
+
+    _wX_prev:float = 0.0
+    _wY_prev:float = 0.0
+    _wZ_prev:float = 0.0
+    _wA_prev:float = 0.0
+    _wB_prev:float = 0.0
+    _wC_prev:float = 0.0
+    _wpos_changed:bool  = False
+
     _dXY:float = DXYZ_STEPS[1]
     _dZ:float = DXYZ_STEPS[1]
     _feedrate:float =  FEED_STEPS[2]
     _mpg:bool = None
     neo = None
     neo_refresh:bool = False
+    _pressedArea:str= None
+    _pressedX:int= None
+    _pressedY:int= None
+    _pressedOldX:int= None
+    _pressedOldY:int= None
 
     debug:bool = DEBUG 
     _error:str = ''
@@ -303,14 +326,16 @@ class GrblState(object):
     # initialize neo display labels
     def neoInit(self):
         self._msg_conf = [
-            ('x', '     '        , VFD_RED   ,  270,  35, 3,126), #9*14
-            ('y', '     '        , VFD_YELLOW,  270,  115, 3,126),
-            ('z', '     '        , VFD_LBLUE ,  270, 195, 3,126),
-            ('cmd', '     '      , VFD_WHITE ,    0, 260, 2,308),  #14*22
-            ('state', '     '    , VFD_WHITE ,  190,  10, 2,310-190),
-            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 2,100),
-            ('term', '\nF1\nHelp', VFD_YELLOW,    0,  40, 2,160),
-            ('info', 'info'      , VFD_WHITE,    0, 280, 1,306) #6*51
+            ('x', '     '        , VFD_RED   ,  150,  35, 3, 126    ,1), #9*14
+            ('y', '     '        , VFD_YELLOW,  150, 115, 3, 126    ,1),
+            ('z', '     '        , VFD_LBLUE ,  150, 195, 3, 126    ,1),
+            ('cmd', '     '      , VFD_WHITE ,    0, 260, 2, 308    ,1),  #14*22
+            ('state', '     '    , VFD_WHITE ,  190,  10, 2, 310-190,1),
+            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 2, 100    ,1),
+            ('term', 'F1 - Help' , VFD_WHITE,     0,  40, 2, 140    ,5),
+            ('<', '<<'          , VFD_YELLOW ,  40,  380, 3, 60 ,1),
+            ('>', '>>'          , VFD_LBLUE ,  220,  380, 3, 60 ,1),
+            ('info', 'info'      , VFD_WHITE,     0, 280, 2, 306    ,3)  #6*51
         ]
         
         self.labels = {}  # dictionary of configured messages_labels
@@ -345,21 +370,22 @@ class GrblState(object):
         # writer.set_clip(False, False, True) #row_clip=None, col_clip=None, wrap=None
         
         for c1 in self._msg_conf:
-            (name, textline, color, x, y, scale, width) = c1  # unpack tuple into five var names
+            (name, textline, color, x, y, scale, width, nlines ) = c1  # unpack tuple into five var names
             fnt=arial35 if scale==3 else (arial10 if scale==1 else fixed)
             writer = CWriter(self.neo, fnt, verbose=self.debug)
             writer.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
 
 
             if name in ('xyz'):
+              self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
               flw=writer.stringlen(name.upper()+': ')
               fl=Label(writer, y, x, flw,fgcolor=color)
               fl.value(name.upper()+': ',fgcolor=color)
-              ll=Label(writer, y, x+flw, writer.stringlen('-999.999'), bdcolor=None)
-              ll.value('{:7.3f}'.format(-123.012), fgcolor=VFD_WHITE)
+              ll=Label(writer, y, x+flw, writer.stringlen('-999.99'), bdcolor=None)
+              ll.value('{:6.2f}'.format(-123.01), fgcolor=VFD_WHITE)
               
               self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
-            elif name in ('info','state'):
+            elif name in ('state'):
               ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
@@ -373,7 +399,12 @@ class GrblState(object):
               else:    
                 ll.value(name)
               self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
-            else: #term etc
+            elif name in ('info','term'):
+              ll=Textbox(writer, clip=False, row=y, col=x, width=width, nlines=nlines, bdcolor=False, fgcolor=color,bgcolor=VFD_BG)
+              if textline.strip()!='':
+                  ll.append(textline)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'))
+            else: # etc
               ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=color)
@@ -461,29 +492,34 @@ class GrblState(object):
             len1 += len(cc)+1
             textF +='|'+cc
       return textF
-            
+
+    def neoPressedDraw(self):
+        if self._pressedX is not None and self._pressedY is not None:
+            if self._pressedOldX is not None and self._pressedOldY is not None:
+                self.neo.rect(self._pressedOldX-5,self._pressedOldY-5,10,10,VFD_BG,True)
+            self.neo.rect(self._pressedX-5,self._pressedY-5,10,10,VFD0_WHITE,True)
+            self.neo_refresh= True
+
     # draw/update neo display label    
     def neoDraw(self,id):
         if id is not None:
             if DEBUG:
                 print('neoDraw['+id+']',self.labels[id].x,self.labels[id].y,self.labels[id].color,self.labels[id].text)
+            if isinstance(self.labels[id].label,Textbox )  :
+              self.labels[id].label.clear()
+              self.labels[id].label.fgcolor=self.labels[id].color
+              # self.labels[id].label.append(self.labels[id].text)
+              self.labels[id].label.append(self.labels[id].text[ : self.labels[id].chars])
+              
+              self.labels[id].label.goto(0)
+            else:   
+              if self.labels[id].charsl-len(self.labels[id].text)>0:
+                  self.labels[id].label.value( self.labels[id].text + ( " " * (self.labels[id].charsl + (1 if id not in('xyz') else 0)  - len(self.labels[id].text) ))   ,fgcolor=self.labels[id].color)
+              else:    
+                self.labels[id].label.value(self.labels[id].text[:self.labels[id].charsl],fgcolor=self.labels[id].color)
             
-            if self.labels[id].charsl-len(self.labels[id].text)>0:
-                self.labels[id].label.value( self.labels[id].text + ( " " * (self.labels[id].charsl + (1 if id not in('xyz') else 0)  - len(self.labels[id].text) ))   ,fgcolor=self.labels[id].color)
-            else:    
-              self.labels[id].label.value(self.labels[id].text[:self.labels[id].charsl],fgcolor=self.labels[id].color)
-            
-            #print('neoDraw['+id+']',self.labels[id].charsl,self.labels[id].x,self.labels[id].y,self.labels[id].color,self.labels[id].text)
-            #self.labels[id].label.value(self.labels[id].text,fgcolor=self.labels[id].color)
             self.neo_refresh= True
             
-            #self.neo.text(self.labels[id].text,self.labels[id].x,self.labels[id].y,self.labels[id].color)
-            #self.neo.show_up()
-        #self.RED   =   0x07E0
-        #self.GREEN =   0x001f
-        #self.BLUE  =   0xf800
-        #self.WHITE =   0xffff
-        #self.BLACK =   0x0000            
             
     # ui label`s updater
     def neoLabel(self,text,id='info',color=None):
@@ -504,17 +540,11 @@ class GrblState(object):
               color = VFD_WHITE      
         l_id=id
         if id=='x':
-          self.labels[id].text = '{0:.3f}'.format(self._mX)
-          #self.labels[id].color=VFD_ARROW_X
-          #self.labels[id].color=VFD_LABEL_X
+          self.labels[id].text = '{0:.2f}'.format(self._mX)
         elif id=='y': 
-          self.labels[id].text = '{0:.3f}'.format(self._mY)  
-          #self.labels[id].color=VFD_ARROW_Y
-          #self.labels[id].color=VFD_LABEL_Y
+          self.labels[id].text = '{0:.2f}'.format(self._mY)  
         elif id=='z':
-          self.labels[id].text = '{0:.3f}'.format(self._mZ)  
-          #self.labels[id].color=VFD_ARROW_Z
-          #self.labels[id].color=VFD_LABEL_Z
+          self.labels[id].text = '{0:.2f}'.format(self._mZ)  
         elif id=='cmd':
           self.labels[id].text = text
           if color is None:
@@ -538,14 +568,13 @@ class GrblState(object):
              self.labels[id].color=color
 
         elif id=='term':
-        #   self.labels['term'].hidden= False
-          self.labels[id].text = self.neoSplitTerm(text)
+          self.labels[id].text = text
           if color is None:
              self.labels[id].color=VFD_GREEN
           else:   
              self.labels[id].color=color
         elif id=='info':
-          self.labels[id].text = self.neoSplitLine(text)
+          self.labels[id].text = text
           if color is None:
              self.labels[id].color=VFD_LBLUE if self._mpg  else VFD_WHITE
           else:   
@@ -1020,6 +1049,8 @@ class GrblState(object):
                         
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
                         self.changeMpos(elem[1].split(','))
+                    elif  len(elem)>1 and elem[0]=='WCO' and elem[1] is not None:       
+                        self.changeWCO(elem[1].split(','))    
             if l_state is not None:
                  self.changeState(l_state)            
             self._parse_state_code='done'
@@ -1189,7 +1220,6 @@ class GrblState(object):
     
     # event when grbl pos changed
     def changeMpos(self, xyz):
-      old_inited= self._mPosInited                        
       if len(xyz)==3:
         self._mX_prev, self._mY_prev,self._mZ_prev = (self._mX, self._mY,self._mZ)
         self._mX, self._mY,self._mZ = [ float(xx) for xx in xyz ]
@@ -1211,6 +1241,33 @@ class GrblState(object):
       if self._mpos_changed:
          #print('changeMpos:')
          self.initRotaryMpos()
+         self.neo_refresh= True
+
+
+
+ 
+    # event when grbl pos changed
+    def changeWCO(self, xyz):
+      if len(xyz)==3:
+        self._wX_prev, self._wY_prev,self._wZ_prev = (self._wX, self._wY,self._wZ)
+        self._wX, self._wY,self._wZ = [ float(xx) for xx in xyz ]
+        self._wpos_changed = True
+      elif len(xyz)==4:
+        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev = (self._wX, self._wY,self._wZ,self._wA)
+        self._wX, self._wY,self._wZ,self._wA = [ float(xx) for xx in xyz ]  
+        self._wpos_changed = True
+      elif len(xyz)==5:
+        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev,self._wB_prev = (self._wX, self._wY,self._wZ,self._wA,self._wB)
+        self._wX, self._wY,self._wZ,self._wA,self._wB = [ float(xx) for xx in xyz ]  
+        self._wpos_changed = True
+      elif len(xyz)==6:
+        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev,self._wB_prev,self._wC_prev = (self._wX, self._wY,self._wZ,self._wA,self._wB,self._wC)
+        self._wX, self._wY,self._wZ,self._wA,self._wB,self._wC = [ float(xx) for xx in xyz ]  
+        self._wpos_changed = True
+
+      self._wpos_changed = (self._wX_prev != self._wX or self._wY_prev != self._wY or self._wZ_prev != self._wZ)
+      if self._wpos_changed:
+         print('changeWpos:', self._wX, self._wY, self._wZ)
          self.neo_refresh= True
 
     def initRotaryMpos(self):
@@ -1300,36 +1357,49 @@ class GrblState(object):
                         self.grblJog(z=step, feedrate=feed)
 
     def touchscreen_press(self,x, y):
-        print('touchscreen_press:',x,y)  
-        pressed=''
+        # print('touchscreen_press:',x,y)  
+        self._pressedArea=''
+        self._pressedOldX = self._pressedX
+        self._pressedOldY = self._pressedY  
+        self._pressedX = x
+        self._pressedY = y
+        self.neoPressedDraw()
+        
+
         for label in self.labels:
-            if label in ('x','y','z'):
+            if label in ('x','y','z','<','>'):
                ll=self.labels[label]
-               print (label,ll.x, ll.y, ll.width, ll.height)
-               if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-ll.height-2 and y<=ll.y+2:
-                   pressed=label
+               if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-2 and y<=ll.y+ll.height+2:
+                   self._pressedArea=label
                    break
-        if pressed!='':       
-          print('  pressed ',pressed) 
-          if self.labels[pressed].color!=VFD_YELLOW:
-             self.labels[pressed].color=VFD_YELLOW
-             self.neo_refresh =True
-             if self.rotaryObj[0]['axe']!=pressed:
-                 self.rotaryObj[0]['axe'] = pressed
-                 self.neoLabel('',id=pressed)
-                 self.initRotaryMpos()
-             if pressed!='x' and self.labels['x'].color!=VFD_LBLUE:
-                self.labels['x'].color=VFD_LBLUE
-                self.neoLabel('',id='x')
-             if pressed!='y' and self.labels['y'].color!=VFD_LBLUE:
-                self.labels['y'].color=VFD_LBLUE
-                self.neoLabel('',id='y')
-             if pressed!='z' and self.labels['z'].color!=VFD_LBLUE:
-                self.labels['z'].color=VFD_LBLUE
-                self.neoLabel('',id='z')
-      
-      
+        if self._pressedArea!='':       
+          print('  pressed ',self._pressedArea) 
+          if self._pressedArea in ('x','y','z'):       
+            if self.labels[self._pressedArea].color!=VFD_YELLOW:
+              self.labels[self._pressedArea].color=VFD_YELLOW
+              self.neo_refresh =True
+              if self.rotaryObj[0]['axe']!=self._pressedArea:
+                  self.rotaryObj[0]['axe'] = self._pressedArea
+                  self.neoLabel('',id=self._pressedArea)
+                  self.initRotaryMpos()
+              if self._pressedArea!='x' and self.labels['x'].color!=VFD_LBLUE:
+                  self.labels['x'].color=VFD_LBLUE
+                  self.neoLabel('',id='x')
+              if self._pressedArea!='y' and self.labels['y'].color!=VFD_LBLUE:
+                  self.labels['y'].color=VFD_LBLUE
+                  self.neoLabel('',id='y')
+              if self._pressedArea!='z' and self.labels['z'].color!=VFD_LBLUE:
+                  self.labels['z'].color=VFD_LBLUE
+                  self.neoLabel('',id='z')
 
+    def button_red_callback(self,pin,button):
+        print('button_red_callback')
 
-               
-                
+    def button_red_callback_long(self,pin,button):
+        print('button_red_callback_long')
+ 
+    def button_yellow_callback(self,pin,button):
+        print('button_yellow_callback')
+
+    def button_yellow_callback_long(self,pin ,button):
+        print('button_yellow_callback_long')

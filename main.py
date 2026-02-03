@@ -1,4 +1,4 @@
-from machine import UART
+from machine import UART, Pin
 import machine
 import time
 import sys
@@ -7,22 +7,20 @@ from nanoguilib.color_setup import ssd
 from nanoguilib.nanogui import refresh
 from TermReader import TermReader
 from ns2009 import Touch
+from button import Button
 
 
 print(machine.freq()) 
-# Set CPU to 240 MHz
-machine.freq(240000000)
+# Set CPU to 300 MHz
+machine.freq(300000000)
 # Verify the new frequency
 print(machine.freq()) 
 
 # Initialize UART (adjust parameters for your board/pins)
-# Example for a Raspberry Pi Pico (UART 0 on GP0/GP1)
+
 uartMPG = UART(0, baudrate=115200, tx=0, rx=1) 
 
-# Alternatively, for Pyboard (adjust port/pins as needed)
-# from pyb import UART
-# uart = UART(1, 9600) 
-
+ 
 from grblUartState import GrblState
 from SmartKbd import SmartKbd
 kbd=SmartKbd()
@@ -43,11 +41,7 @@ rot0 = RotaryIRQ(pin_num_dt=27,
 
 DEBUG = False
 
-#from LCD_2inch8 import LCD_2inch8
-#lcd = LCD_2inch8()
-#lcd.bl_ctrl(100)
-#lcd.fill(lcd.BLACK)
-#lcd.show_up()
+ 
 
 refresh(ssd, True)
 
@@ -65,23 +59,21 @@ refresh(ssd)
 term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
-ns = Touch()
+ns = Touch(isLandscape=False)
 ns.set_int_handler(st.touchscreen_press)
 print('touch initialized')
 
+bt_red=Button(pin=Pin(16, Pin.IN, Pin.PULL_UP),callback=st.button_red_callback,callback_long=st.button_red_callback_long)
+bt_yellow=Button(pin=Pin(17, Pin.IN, Pin.PULL_UP),callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
 
 
-#  File "grblUartState.py", line 108, in uart_callback
-#  File "grblUartState.py", line 1099, in procUartInByte
-# File "grblUartState.py", line 111, in uart_callback
-#MemoryError: memory allocation failed, allocating 9042 bytes
+ 
 
 
 while True:
-    #st.query4MPG()
+ 
     st.p_RTLoop()
-    # if st.need_query:
-    #     st.send2grblOne('?') # get status from grbl cnc machine    
+  
         
     if st.neo_refresh:
         st.neo_refresh=False

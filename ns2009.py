@@ -5,13 +5,13 @@ import time
 from machine import Pin,I2C
 
 
-LCD_DC   = 15
-LCD_CS   = 13
-LCD_SCK  = 10
-LCD_MOSI = 11
-LCD_MISO = 12
-LCD_BL   = 13
-LCD_RST  = 15
+# LCD_DC   = 15
+# LCD_CS   = 13
+# LCD_SCK  = 10
+# LCD_MOSI = 11
+# LCD_MISO = 12
+# LCD_BL   = 13
+# LCD_RST  = 15
 
 TP_SDA    = 8
 TP_SCL    = 9
@@ -19,13 +19,9 @@ TP_IRQ   = 14
 SAMPLES = 10
 
 
-#NS2009_LOW_POWER_READ_X = 0xc0
-#NS2009_LOW_POWER_READ_Y = 0xd0
 NS2009_LOW_POWER_READ_Y = 0xc0
 NS2009_LOW_POWER_READ_X = 0xd0
 NS2009_LOW_POWER_READ_Z1 = 0xe0
-#SCREEN_X_PIXEL=320
-#SCREEN_Y_PIXEL=480
 SCREEN_X_PIXEL=480
 SCREEN_Y_PIXEL=320
 
@@ -38,7 +34,8 @@ class Touch(object):
 
  
     def __init__(self,  width=SCREEN_X_PIXEL, height=SCREEN_Y_PIXEL,
-                 x_min=328, x_max=3865, y_min=334, y_max=3800):
+                 isLandscape=True,
+                 long_side_min=280, long_side_val=3600, small_side_min=290, small_side_val=3600):
         """Initialize touch screen controller.
         Args:
             spi (Class Spi):  SPI interface for OLED
@@ -55,15 +52,16 @@ class Touch(object):
         self.width = width
         self.height = height
         # Set calibration
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
-        self.x_multiplier = width / (x_max - x_min)
-        self.x_add = x_min * -self.x_multiplier
-        self.y_multiplier = height / (y_max - y_min)
-        self.y_add = y_min * -self.y_multiplier
-
+        self.x_min = long_side_min
+        self.x_max = long_side_min+long_side_val
+        self.y_min = small_side_min
+        self.y_max = small_side_min+small_side_val
+        self.x_multiplier = width / (long_side_val)
+        self.x_add = long_side_min * -self.x_multiplier
+        self.y_multiplier = height / (small_side_val)
+        self.y_add = small_side_min * -self.y_multiplier
+        self.isLandscape = isLandscape
+        # Initialize I2C
         self.i2c = I2C(0, scl=Pin(TP_SCL), sda=Pin(TP_SDA), freq=400000)
         
 
@@ -128,9 +126,15 @@ class Touch(object):
 
     def normalize(self, x, y):
         """Normalize mean X,Y values to match LCD screen."""
+        #print('self.isLandscape',self.isLandscape)
         x = int(self.x_multiplier * x + self.x_add)
-        y = self.height-int(self.y_multiplier * y + self.y_add)
-        return x, y
+        y = int(self.y_multiplier * y + self.y_add)
+        if self.isLandscape:
+            #print('is Landscape',self.isLandscape,' witdh [x]',self.width,' height [y]',self.height)
+            return  x,self.height-y
+        else:
+            #print('is portrait',self.isLandscape,' witdh [x]',self.width,' height [y]',self.height)
+            return  self.height-y,self.width-x
 
 
 
@@ -154,21 +158,4 @@ class Touch(object):
        else:
            return None
        
-
-
-
-#def ns2009_recv(cmd):
-#   buf = bytearray(1)
-#   buf[0]=cmd
-#   i2c.writeto(NS2009_ADDR, buf)
-#   ret=i2c.readfrom(NS2009_ADDR, 2)   # read 2 bytes from device with address NS2009_ADDR
-#   return ret           
-           
-#def ns2009_read( cmd):
-#       buf=ns2009_recv(cmd);
-#       return (buf[0] << 4) | (buf[1] >> 4)       
-       
-
-  
-        
 
