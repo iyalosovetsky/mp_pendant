@@ -7,7 +7,7 @@ from machine import UART
 #from nanoguilib.color_setup import ssd
 from nanoguilib.writer import CWriter
 from nanoguilib.meter import Meter
-from nanoguilib.label import Label
+from nanoguilib.label import Label, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER 
 from nanoguilib.textbox import Textbox
 
 # Fonts
@@ -24,6 +24,7 @@ NOBLINK = 4
 X_ARROW_COLOR = 'red'
 Y_ARROW_COLOR = 'green'
 Z_ARROW_COLOR = 'lblue'
+ICON_COLOR = 'white'
 
 DEBUG= False
 
@@ -117,13 +118,31 @@ def uart_callback(uart_object):
         
         
 
-
+def color2rgb(color:str):
+    if color is not None and isinstance(color,str):
+        if color.lower() == 'red':
+          color = VFD_RED
+        elif color.lower() == 'green':   
+          color = VFD_GREEN
+        elif color.lower() == 'blue':   
+          color = VFD_BLUE
+        elif color.lower() == 'lblue':   
+          color = VFD_LBLUE
+        elif color.lower() == 'purple':   
+          color = VFD_PURPLE      
+        elif color.lower() == 'yellow':   
+          color = VFD_YELLOW      
+        elif color.lower() == 'white':   
+          color = VFD_WHITE
+        else:
+           color = VFD_WHITE   
+    return  color
 
         
 
 class NeoLabelObj(object):
     def __init__(self, color:int , scale:float,x:int,y:int,text:str = '',label=None,fldLabel=None,
-                 width:int=100,oneWidth:int=20, nlines:int=1 ):
+                 width:int=100,oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT ):
         self.x= x
         self.y= y
         self.text=  text
@@ -135,6 +154,8 @@ class NeoLabelObj(object):
         self.height= self.label.height
         self.oneWidth= oneWidth
         self.charsl=5
+        self.hidden = False
+        self.align =  align
         self.chars = 5
         if self.width is not None and self.oneWidth is not None and self.oneWidth>0 and self.width>0 :
           # self.charsl=self.width//self.oneWidth + (1 if (self.width%self.oneWidth)>0 else 0)
@@ -237,6 +258,10 @@ class GrblState(object):
 
     _jog_arrow:str = ''
 
+    _ui_modes=['main','drive','feedMov','feedDrv','confirm'] #confirm must be last
+    _ui_mode=0
+    _ui_confirm='unkn'
+
     
 
 
@@ -326,18 +351,21 @@ class GrblState(object):
     # initialize neo display labels
     def neoInit(self):
         self._msg_conf = [
-            ('x', '     '        , VFD_RED   ,  150,  35, 3, 126    ,1), #9*14
-            ('y', '     '        , VFD_YELLOW,  150, 115, 3, 126    ,1),
-            ('z', '     '        , VFD_LBLUE ,  150, 195, 3, 126    ,1),
-            ('cmd', '     '      , VFD_WHITE ,    0, 260, 2, 308    ,1),  #14*22
-            ('state', '     '    , VFD_WHITE ,  190,  10, 2, 310-190,1),
-            ('icon', 'grbl'      , VFD_PURPLE,    0,   0, 2, 100    ,1),
-            ('term', 'F1 - Help' , VFD_WHITE,     0,  40, 2, 140    ,5),
-            ('<', '<<'          , VFD_YELLOW ,  40,  380, 3, 60 ,1),
-            ('>', '>>'          , VFD_LBLUE ,  220,  380, 3, 60 ,1),
-            ('info', 'info'      , VFD_WHITE,     0, 280, 2, 306    ,3)  #6*51
-        ]
-        
+            ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
+            ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
+            ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
+            ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
+            ('state', '     '    , 'white'         ,  190,  10,  2, 310-190,1, ALIGN_LEFT),
+            #('icon', 'grbl'      , ICON_COLOR,    0,   0, 2, 100    ,1),
+            ('term', 'F1 - Help' , 'white',             0,  40,  2, 140          ,5, ALIGN_LEFT),
+            ('<', '<<'          ,  'yellow'        ,   40, 380,  3, 60     ,1, ALIGN_LEFT),
+            ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 40+3*14,  385, 2, 220-40-3*14    ,1, ALIGN_CENTER),
+            ('>', '>>'          ,  'lblue'         ,  220, 380,  3, 60     ,1, ALIGN_LEFT),
+            ('info', 'info'      , 'white'         ,    0, 280,  2, 306    ,3, ALIGN_LEFT)  #6*51
+        ]        
+
+
+
         self.labels = {}  # dictionary of configured messages_labels
         self.help = [
            '^r reboot',
@@ -370,7 +398,8 @@ class GrblState(object):
         # writer.set_clip(False, False, True) #row_clip=None, col_clip=None, wrap=None
         
         for c1 in self._msg_conf:
-            (name, textline, color, x, y, scale, width, nlines ) = c1  # unpack tuple into five var names
+            (name, textline, color, x, y, scale, width, nlines,align ) = c1  # unpack tuple into five var names
+            color = color2rgb(color)
             fnt=arial35 if scale==3 else (arial10 if scale==1 else fixed)
             writer = CWriter(self.neo, fnt, verbose=self.debug)
             writer.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
@@ -381,36 +410,36 @@ class GrblState(object):
               flw=writer.stringlen(name.upper()+': ')
               fl=Label(writer, y, x, flw,fgcolor=color)
               fl.value(name.upper()+': ',fgcolor=color)
-              ll=Label(writer, y, x+flw, writer.stringlen('-999.99'), bdcolor=None)
+              ll=Label(writer, y, x+flw, writer.stringlen('-999.99'), bdcolor=None, align=align)
               ll.value('{:6.2f}'.format(-123.01), fgcolor=VFD_WHITE)
               
-              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=VFD_WHITE , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
             elif name in ('state'):
-              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
               if textline.strip()!='':
-                  ll.value(textline,fgcolor=color)
+                  ll.value(textline,fgcolor=color, align=align)
               else:    
-                ll.value(name,fgcolor=color)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+                ll.value(name,fgcolor=color, align=align)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('cmd','icon'):
-              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
               if textline.strip()!='':
-                  ll.value(textline,fgcolor=color)
+                  ll.value(textline,fgcolor=color, align=align)
               else:    
-                ll.value(name)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+                ll.value(name, align=align)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('info','term'):
               ll=Textbox(writer, clip=False, row=y, col=x, width=width, nlines=nlines, bdcolor=False, fgcolor=color,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.append(textline)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'))
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'))
             else: # etc
-              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG)
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
               if textline.strip()!='':
-                  ll.value(textline,fgcolor=color)
+                  ll.value(textline,fgcolor=color, align=align)
               else:    
-                ll.value(name,fgcolor=color)
-              self.labels[name] = NeoLabelObj(text  = textline, color=color , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+                ll.value(name,fgcolor=color, align=align)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
        
         self.neo_refresh= True
 
@@ -513,31 +542,18 @@ class GrblState(object):
               
               self.labels[id].label.goto(0)
             else:   
-              if self.labels[id].charsl-len(self.labels[id].text)>0:
-                  self.labels[id].label.value( self.labels[id].text + ( " " * (self.labels[id].charsl + (1 if id not in('xyz') else 0)  - len(self.labels[id].text) ))   ,fgcolor=self.labels[id].color)
+              if self.labels[id].charsl-len(self.labels[id].text)>0  and (self.labels[id].align is None or self.labels[id].align==ALIGN_LEFT) :
+                  self.labels[id].label.value( self.labels[id].text + ( " " * (self.labels[id].charsl + (1 if id not in('xyz') else 0)  - len(self.labels[id].text) ))   ,fgcolor=self.labels[id].color, align=self.labels[id].align)
               else:    
-                self.labels[id].label.value(self.labels[id].text[:self.labels[id].charsl],fgcolor=self.labels[id].color)
+                self.labels[id].label.value(self.labels[id].text[:self.labels[id].charsl],fgcolor=self.labels[id].color, align=self.labels[id].align)
             
             self.neo_refresh= True
             
             
     # ui label`s updater
     def neoLabel(self,text,id='info',color=None):
-        if color is not None and isinstance(color,str):
-           if color.lower() == 'red':
-              color = VFD_RED
-           elif color.lower() == 'green':   
-              color = VFD_GREEN
-           elif color.lower() == 'blue':   
-              color = VFD_BLUE
-           elif color.lower() == 'lblue':   
-              color = VFD_LBLUE
-           elif color.lower() == 'purple':   
-              color = VFD_PURPLE      
-           elif color.lower() == 'yellow':   
-              color = VFD_YELLOW      
-           elif color.lower() == 'white':   
-              color = VFD_WHITE      
+        
+        color = color2rgb(color)
         l_id=id
         if id=='x':
           self.labels[id].text = '{0:.2f}'.format(self._mX)
@@ -606,7 +622,7 @@ class GrblState(object):
        
 
     def neoIcon(self,text,color=None) :     
-        self.neoLabel(text,id='icon',color=VFD_YELLOW if color is None else  color)
+        self.neoLabel(text,id='icon',color=color2rgb(ICON_COLOR) if color is None else  color)
 
     def neoTerm(self,text,color=None) :   
         #print("neoTerm",text)  
@@ -660,6 +676,8 @@ class GrblState(object):
           idx += 1
       idx %= len(lst)
       return lst[idx]
+
+
 
 
       
@@ -1123,7 +1141,7 @@ class GrblState(object):
       self.neoLabel('',id='x')
       self.neoLabel('',id='y')
       self.neoLabel('',id='z')
-      #self.neoLabel('MPG  ' if self._mpg else 'nompg',id='icon')
+      
       
       
       
@@ -1137,11 +1155,11 @@ class GrblState(object):
                   self.neoLabel(self.state,id='state')
               elif self.state == 'run':    
                   self.neoLabel(self.state,id='state')
-                  self.neoIcon('\n  Run')
+                  self.neoIcon('Run')
               elif self.state == 'jog':    
                   self.neoLabel(self.state,id='state')
                   self.neoDisplayJog()
-                  self.neoIcon('\n  Jog')
+                  #self.neoIcon('Jog')
               elif self.state=='unlocked':
                   self.neoLabel(self.state,id='state')
               elif self.state=='hold:1':
@@ -1174,7 +1192,7 @@ class GrblState(object):
         elif self._jog_arrow[-1:]=='z':  
            color=Z_ARROW_COLOR
         if self._jog_arrow=='': 
-           self.neoIcon(text='         ')   
+           self.neoIcon(text=self._ui_modes[self._ui_mode])   
         else:
           self.neoIcon(text=('>>>' if self._jog_arrow.startswith('+') else '<<<') +
                        ''+(' {0:.1f}'.format(self._dZ) if self._jog_arrow.endswith('z') else ' {0:.1f}'.format(self._dXY))
@@ -1373,8 +1391,10 @@ class GrblState(object):
                    self._pressedArea=label
                    break
         if self._pressedArea!='':       
-          print('  pressed ',self._pressedArea) 
-          if self._pressedArea in ('x','y','z'):       
+          print('  pressed ',self._pressedArea)
+          if self._pressedArea in ('<','>'):
+             self.nextUiMode(-1 if self._pressedArea in ('<') else 1)
+          elif self._pressedArea in ('x','y','z'):       
             if self.labels[self._pressedArea].color!=VFD_YELLOW:
               self.labels[self._pressedArea].color=VFD_YELLOW
               self.neo_refresh =True
@@ -1392,14 +1412,54 @@ class GrblState(object):
                   self.labels['z'].color=VFD_LBLUE
                   self.neoLabel('',id='z')
 
-    def button_red_callback(self,pin,button):
+    def nextUiMode(self, direction):
+        self._ui_mode+=direction
+        if direction==0: # enter in confirm mode
+          self._ui_mode_prev=self._ui_mode
+          self._ui_mode = len(self._ui_modes)-1 # 'confirm' mode, last element    
+        elif self._ui_mode<0:
+          self._ui_mode=len(self._ui_modes)-1
+        elif self._ui_mode>=len(self._ui_modes)-1 or self._ui_modes[self._ui_mode]=='confirm':
+          self._ui_mode=0
+
+        self._ui_confirm='unkn'
+        self.neoIcon(text=self._ui_modes[self._ui_mode])   
+
+    def enterConfirmMode(self):
+       self.nextUiMode(0)
+
+
+    def getConfirm(self):
+       answ=self._ui_confirm
+       self._ui_confirm='unkn'
+       return answ
+
+          
+       
+
+
+    def button_red_callback(self,pin,button): # right key
         print('button_red_callback')
+        if self._ui_modes[self._ui_mode] == 'confirm':
+          self._ui_confirm='no'
+          self._ui_mode= self._ui_mode_prev
+        else:
+          self.nextUiMode(1) 
+           
+             
 
     def button_red_callback_long(self,pin,button):
         print('button_red_callback_long')
  
     def button_yellow_callback(self,pin,button):
         print('button_yellow_callback')
+        if self._ui_modes[self._ui_mode] == 'confirm':
+          self._ui_confirm='yes'
+          self._ui_mode= self._ui_mode_prev
+        else:
+          self.nextUiMode(-1) 
+
 
     def button_yellow_callback_long(self,pin ,button):
         print('button_yellow_callback_long')
+

@@ -63,8 +63,8 @@ ns = Touch(isLandscape=False)
 ns.set_int_handler(st.touchscreen_press)
 print('touch initialized')
 
-bt_red=Button(pin=Pin(16, Pin.IN, Pin.PULL_UP),callback=st.button_red_callback,callback_long=st.button_red_callback_long)
-bt_yellow=Button(pin=Pin(17, Pin.IN, Pin.PULL_UP),callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
+bt_red=Button(pin=Pin(17, Pin.IN, Pin.PULL_UP),callback=st.button_red_callback,callback_long=st.button_red_callback_long)
+bt_yellow=Button(pin=Pin(16, Pin.IN, Pin.PULL_UP),callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
 
 
  
