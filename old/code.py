@@ -52,7 +52,9 @@ uartMPG = busio.UART(board.GP0, board.GP1, baudrate=115200, receiver_buffer_size
 #LCD_CS	GP9	Chip select pin of LCD (Low active)
 #LCD_CLK	GP10	SPI CLK pin, clock input for slave device
 #MOSI	GP11	SPI MOSI, data input for slave device
-#MISO	GP12	SPI MISO pin, data output for slave device
+
+#MISO	GP12(rx)	SPI MISO pin, data output for slave device
+
 #LCD_BL	GP13	LCD backlight control
 #LCD_RST	GP15	LCD reset pin (Low active)
 #TP_CS	GP16	Touch controller chip select pin (Low active)

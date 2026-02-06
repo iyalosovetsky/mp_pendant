@@ -207,6 +207,9 @@ class GrblState(object):
     _feedrateJog:float =  FEED_STEPS[2]
     _feedrateRun:float =  FEED_STEPS[2]
     _mpg:bool = None
+    _wcs:str = '' #Work Coordinate System (WCS)
+    _wcs_prev:str = '' #Work Coordinate System (WCS)
+    _wcs_changed:bool = False
     neo = None
     neo_refresh:bool = False
     _pressedArea:str= None
@@ -357,7 +360,8 @@ class GrblState(object):
             ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
             ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
             ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
-            ('state', '     '    , 'white'         ,  190,  10,  2, 310-190,1, ALIGN_LEFT),
+            ('feed', '1000 Abs WCO'    , 'white'         ,  0,  0,  2, 185,1, ALIGN_LEFT),
+            ('state', '     '    , 'white'         ,  190,  0,  2, 310-190,1, ALIGN_LEFT),
             #('icon', 'grbl'      , ICON_COLOR,    0,   0, 2, 100    ,1),
             ('term', 'F1 - Help' , 'white',             0,  40,  2, 140          ,5, ALIGN_LEFT),
             ('<', '<<'          ,  'yellow'        ,   40, 400,  3, 60     ,1, ALIGN_LEFT),
@@ -422,6 +426,11 @@ class GrblState(object):
                   ll.value(textline,fgcolor=color, align=align)
               else:    
                 ll.value(name,fgcolor=color, align=align)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+            elif name in ('feed'):
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
+              textline='{:4.0f}'.format(self._feedrateJog)+' Abs Mpos'
+              ll.value(textline,fgcolor=color, align=align)
               self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('cmd','icon'):
               ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
@@ -505,8 +514,8 @@ class GrblState(object):
             continue
         if cc.startswith('MPos'):
             continue
-        if cc.startswith('WCO:0.000,0.000,0.000'):
-            continue
+        #if cc.startswith('WCO:0.000,0.000,0.000'):
+        #    continue
         if cc.startswith('Ov:100,100,100'):
             continue
         if cc.startswith('FW:grblHAL'):
@@ -577,6 +586,16 @@ class GrblState(object):
              self.labels[id].color=VFD_WHITE
           else:   
              self.labels[id].color=color
+        elif id=='feed':
+          self.labels[id].text = text+(' MPG' if self._mpg else '')
+          if color is None and text.lower().startswith('alarm'):
+             self.labels[id].color=VFD_RED
+          elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
+             self.labels[id].color=VFD_GREEN
+          elif color is None:
+             self.labels[id].color=VFD_WHITE
+          else:   
+             self.labels[id].color=color             
         elif id=='icon':
           self.labels['term'].hidden=(len(text.strip())>2)
           self.labels[id].text = text
@@ -1088,7 +1107,9 @@ class GrblState(object):
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
                         self.changeMpos(elem[1].split(','))
                     elif  len(elem)>1 and elem[0]=='WCO' and elem[1] is not None:       
-                        self.changeWCO(elem[1].split(','))    
+                        self.changeWCO(elem[1].split(','))
+                    elif  len(elem)>=1 and elem[0]=='WCS' and elem[1] is not None:       
+                        self.changeWCS(elem[1])                            
             if l_state is not None:
                  self.changeState(l_state)            
             self._parse_state_code='done'
@@ -1308,6 +1329,15 @@ class GrblState(object):
       self._wpos_changed = (self._wX_prev != self._wX or self._wY_prev != self._wY or self._wZ_prev != self._wZ)
       if self._wpos_changed:
          print('changeWpos:', self._wX, self._wY, self._wZ)
+         self.neo_refresh= True
+
+
+    def changeWCS(self, wcs):
+      self._wcs_prev = self._wcs
+      self._wcs = wcs
+      self._wcs_changed = (self._wcs_prev != self._wcs)
+      if self._wcs_changed:
+         print('changeWCS:', self._wcs)
          self.neo_refresh= True
 
     def initRotaryMpos(self):

@@ -5,8 +5,17 @@ import time
 from machine import Pin,SPI,PWM
 
 #on ili9488
-#SPI1tx gp11  SPI_MOSI[4](sch) SPI_SDA SDA (Serial Data): Connects to the MCU's hardware SPI MOSI pin (e.g., GPIO 23 on ESP32 or D11 on Uno).
-#SPI1rx gp12  SPI_MISO[3](sch) SPI_SDO SDO (Serial Data Out): SDO (Serial Data Out): Used for reading data back from the display (optional for display-only projects).
+#SPI1tx gp11(tx)  SPI_MOSI[4](sch) SPI_SDA SDA (Serial Data): Connects to the MCU's hardware SPI MOSI pin (e.g., GPIO 23 on ESP32 or D11 on Uno).
+#SPI1rx gp12(rx)  SPI_MISO[3](sch) SPI_SDO SDO (Serial Data Out): SDO (Serial Data Out): Used for reading data back from the display (optional for display-only projects).
+
+#on zero
+#SPI0 MOSI (Master Out Slave In): Pin 19 (GPIO 10)
+#SPI0 MISO (Master In Slave Out): Pin 21 (GPIO 9)
+#SPI0 SCLK (Clock): Pin 23 (GPIO 11)
+
+#SPI0 CE0 (Chip Enable 0): Pin 24 (GPIO 8)
+#SPI0 CE1 (Chip Enable 1): Pin 26 (GPIO 7)
+
 
 LCD_DC   = 8
 LCD_CS   = 9

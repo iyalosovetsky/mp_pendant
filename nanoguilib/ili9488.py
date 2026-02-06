@@ -156,6 +156,7 @@ class ILI9488(framebuf.FrameBuffer):
             madctl = 0x48 if usd else 0x88
         if mirror:
             madctl ^= 0x80  # toggle MY
+        #memory accect control 0x80 portrait 0x20 landscape 90 0x40 portrait usd 0xE0 landscape usd   
         self._wcd(b"\x36", madctl.to_bytes(1, "big"))  # MADCTL: RGB portrait mode
         self._wcmd(b"\x11")  # sleep out
         self._wcmd(b"\x29")  # display on
@@ -260,3 +261,43 @@ class ILI9488(framebuf.FrameBuffer):
                     line += lines
                     self._cs(1)  # Allow other tasks to use bus
                 await asyncio.sleep_ms(0)
+
+
+
+#
+# command 0x01 #Software Reset 
+# delay 100
+# command 0x11 #Sleep out
+# delay 20
+
+# command 0x20 #Display Inversion OFF
+# delay 20
+
+# #command 0x28 #Display OFF
+# command 0xE0 0x00 0x03 0x09 0x08 0x16 0x0A 0x3F 0x78 0x4C 0x09 0x0A 0x08 0x16 0x1A 0x0F #Positive Gamma Control
+# command 0xE1 0x00 0x16 0x19 0x03 0x0F 0x05 0x32 0x45 0x46 0x04 0x0E 0x0D 0x35 0x37 0x0F #Negative Gamma Control
+# command 0xC0 0x17 0x15 #Power Control 1
+# command 0xC1 0x41 #Power Control 2
+# #command 0xC5 0x00 0x4D 0x80 #VCOM Control 1 need 4 parameters
+# #command 0x36 0xE8			#Memory Access Control # BGR (0x0x = portrait 0° mirror, 0x8x = portrait 180°, 0x2x = landscape 90°, 0x4x = portrait 0°)
+# command 0x36 0xE0 #Memory Access Control # BGR (0x0x = portrait 0° mirror, 0x8x = portrait 180°, 0x2x = landscape 90°, 0x4x = portrait 0°)
+# #command 0x3A 0x66 #INTERFACE_PIXEL_FORMAT #0x66 - 18 bit colour for SPI, 0x55 16 bit colour for parallel
+# command 0x3A 0x2D #INTERFACE_PIXEL_FORMAT #0x36 0x66 - 18 bit colour for SPI,0x2d  0x55 16 bit colour for parallel
+# command 0xB0 0x80			#Interface Mode Control 219 page. 0x80 - SDO (MOSI) pin not used.
+# #command 0xB0 0x00 #Interface Mode Control
+# #command 0xB1 0xA0 #Frame Rate Control
+# command 0xB1 0xB0 0x11 #Frame Rate Control
+# command 0xB4 0x01  #1dot inversion
+
+
+# command 0xB6 0x02 0x02 0x3B #Display Inversion Control  - right Display Function Control 
+# #command 0xB7 0x86			# Entry Mode Set p.233
+# command 0xB7 0xC6 # Entry Mode Set p.233
+# #command 0xE9 0x00			#Set Image Function
+
+# command 0xF7 0xA9 0x51 0x2C 0x82 #Adjust Control 3 - defaults
+# #command 0x21 inversion on 
+# command 0x11 #Sleep out
+# delay 200
+# command 0x29 #Display On
+                
