@@ -81,11 +81,16 @@ C_STEP_MIN = 0.1
 C_STEP_Z_MAX = 20.0
 C_STEP_Z_MIN = 0.1
 
-C_FEED_MAX = 2000.0
-C_FEED_MIN = 200.0
+C_FEED_JOG_MAX = 5000.0
+C_FEED_JOG_MIN = 20.0
+
+C_FEED_RUN_MAX = 5000.0
+C_FEED_RUN_MIN = 20.0
+
 
 DXYZ_STEPS=[0.1,1.,10.,50.]
-FEED_STEPS=[10.,100.,200.,500.,1000.]
+FEED_JOG_STEPS=[10.,100.,200.,500.,1000.]
+FEED_RUN_STEPS=[10.,100.,200.,500.,1000.]
 
 
 objgrblState=None
@@ -204,8 +209,8 @@ class GrblState(object):
 
     _dXY:float = DXYZ_STEPS[1]
     _dZ:float = DXYZ_STEPS[1]
-    _feedrateJog:float =  FEED_STEPS[2]
-    _feedrateRun:float =  FEED_STEPS[2]
+    _feedrateJog:float =  FEED_JOG_STEPS[2]
+    _feedrateRun:float =  FEED_JOG_STEPS[2]
     _mpg:bool = None
     _wcs:str = '' #Work Coordinate System (WCS)
     _wcs_prev:str = '' #Work Coordinate System (WCS)
@@ -645,6 +650,16 @@ class GrblState(object):
     def neoIcon(self,text,color=None) :     
         self.neoLabel(text,id='icon',color=color2rgb(ICON_COLOR) if color is None else  color)
 
+    def showFeed(self) :     
+        if self._ui_modes[self._ui_mode] in ('main','feedJog'):
+          text='{:4.0f}'.format(self._feedrateJog)
+        else:
+          text='{:4.0f}'.format(self._feedrateRun)
+        self.neoLabel(text,id='feed')
+
+ 
+
+
     def neoTerm(self,text,color=None) :   
         #print("neoTerm",text)  
         self.neoLabel(text,id='term',color=VFD_WHITE if color is None else  color)
@@ -659,8 +674,8 @@ class GrblState(object):
 
 
     def dec_feedrateJog(self):
-      if self._feedrateJog-100.0 < C_FEED_MIN:
-           self._feedrateJog = C_FEED_MIN
+      if self._feedrateJog-100.0 < C_FEED_JOG_MIN:
+           self._feedrateJog = C_FEED_JOG_MIN
       else:    
            self._feedrateJog -=100.0
       self._state_prev='feed'     
@@ -677,8 +692,8 @@ class GrblState(object):
 
 
     def dec_feedrateRun(self):
-      if self._feedrateRun-100.0 < C_FEED_MIN:
-           self._feedrateRun = C_FEED_MIN
+      if self._feedrateRun-100.0 < C_FEED_JOG_MIN:
+           self._feedrateRun = C_FEED_JOG_MIN
       else:    
            self._feedrateRun -=100.0
       self._state_prev='feed'     
@@ -733,7 +748,7 @@ class GrblState(object):
       #print('g_step _dZ now',self._dZ)     
 
     def set_feedrate(self):
-      self._feedrateJog=self.nextStepVals(self._feedrateJog, FEED_STEPS)
+      self._feedrateJog=self.nextStepVals(self._feedrateJog, FEED_JOG_STEPS)
       self._state_prev='feed'          
       #print('g_feedrate now',self._feedrate) 
 
@@ -1167,7 +1182,7 @@ class GrblState(object):
             self._grblExecProgress='done'
             # set rotary to initial
             if self._ui_modes[self._ui_mode] in ( 'main', 'drive'):
-              self.initRotaryMpos()     
+              self.initRotaryStart()     
         self.neo_refresh= True
 
 
@@ -1301,7 +1316,7 @@ class GrblState(object):
       if self._mpos_changed:
          #print('changeMpos:')
          if self._ui_modes[self._ui_mode] in ( 'main', 'drive'):
-              self.initRotaryMpos()
+              self.initRotaryStart()
          self.neo_refresh= True
 
 
@@ -1340,16 +1355,32 @@ class GrblState(object):
          print('changeWCS:', self._wcs)
          self.neo_refresh= True
 
-    def initRotaryMpos(self):
-        if self._mPosInited: # set rotary mpos only at first time 
-          for rotObj  in self.rotaryObj:  
-            if rotObj['obj'] is not None:
+    def initRotaryStart(self):
+        if not self._mPosInited and self._ui_modes[self._ui_mode] in ('main','drive'): # wait there for coordintes from grbl
+          return 
+        
+        for rotObj  in self.rotaryObj:  
+            if rotObj['obj'] is  None:
+                continue 
+
+            updated=False
+            if self._ui_modes[self._ui_mode] in ('main','drive'):
                 rotObj['mpos'] = (self._mX if rotObj['axe']=='x' else ( self._mY if rotObj['axe']=='y' else self._mZ ))
-                rotObj['rotary_on_mpos'] = rotObj['obj'].value()
-                rotObj['value_prev'] = rotObj['obj'].value()
-                rotObj['value'] = rotObj['obj'].value()
-                rotObj['nanosec'] = time.time_ns()
-                rotObj['nanosec_prev'] = rotObj['nanosec']
+                updated=True
+            elif self._ui_modes[self._ui_mode] in ('feedJog'):
+                rotObj['mpos'] = self._feedrateJog
+                updated=True
+            elif self._ui_modes[self._ui_mode] in ('feedRun'):
+                rotObj['mpos'] = self._feedrateJog
+                updated=True
+            if not updated:
+               continue    
+               
+            rotObj['rotary_on_mpos'] = rotObj['obj'].value()
+            rotObj['value_prev'] = rotObj['obj'].value()
+            rotObj['value'] = rotObj['obj'].value()
+            rotObj['nanosec'] = time.time_ns()
+            rotObj['nanosec_prev'] = rotObj['nanosec']
         
     # link with rotary encoder  object
     def set_rotary_obj(self,rotaryObj,rotN,axe,unit):
@@ -1421,27 +1452,29 @@ class GrblState(object):
     def upd_rotary_on_feedJog(self,rotN:int):    
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
-            return
-        if self.rotaryObj[rotN]['axe']=='x':
-            print('new feedJog ',self.rotaryObj[rotN]['axe'],delta_val)
-            self.neoTerm('feedJog\n'+'{:3.0f}'.format(delta_val),color='red')
-        elif self.rotaryObj[rotN]['axe']=='y':
-            print('new Jog scale ',self.rotaryObj[rotN]['axe'],delta_val)
-            self.neoTerm('scale\n'+'{:3.0f}'.format(delta_val),color='red')
-        elif self.rotaryObj[rotN]['axe']=='z':
-            print('new nothing ',self.rotaryObj[rotN]['axe'],delta_val)            
+           return
+        self._feedrateJog+=delta_val*FEED_JOG_STEPS[0]
+        if self._feedrateJog<C_FEED_JOG_MIN:
+            self._feedrateJog=C_FEED_JOG_MIN
+        elif self._feedrateJog>C_FEED_JOG_MAX:
+            self._feedrateJog=C_FEED_JOG_MAX  
+        self.initRotaryStart()
+        self.showFeed()
+
+     
 
 
     def upd_rotary_on_feedRun(self,rotN:int):    
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
-            return
-        if self.rotaryObj[rotN]['axe']=='x':
-            print('new feedRun ',self.rotaryObj[rotN]['axe'],delta_val)
-        elif self.rotaryObj[rotN]['axe']=='y':
-            print('new Run scale ',self.rotaryObj[rotN]['axe'],delta_val)
-        elif self.rotaryObj[rotN]['axe']=='z':
-            print('new nothing ',self.rotaryObj[rotN]['axe'],delta_val)            
+           return
+        self._feedrateRun+=delta_val*FEED_RUN_STEPS[0]
+        if self._feedrateJog<C_FEED_JOG_MIN:
+            self._feedrateJog=C_FEED_JOG_MIN
+        elif self._feedrateJog>C_FEED_JOG_MAX:
+            self._feedrateJog=C_FEED_JOG_MAX  
+        self.initRotaryStart()
+        self.showFeed()            
 
 
     # task every 1s
@@ -1501,7 +1534,7 @@ class GrblState(object):
               if self.rotaryObj[0]['axe']!=self._pressedArea:
                   self.rotaryObj[0]['axe'] = self._pressedArea
                   self.neoLabel('',id=self._pressedArea)
-                  self.initRotaryMpos()
+                  self.initRotaryStart()
               if self._pressedArea!='x' and self.labels['x'].color!=VFD_LBLUE:
                   self.labels['x'].color=VFD_LBLUE
                   self.neoLabel('',id='x')
@@ -1523,7 +1556,9 @@ class GrblState(object):
           self._ui_mode=0
 
         self._ui_confirm='unkn'
-        self.neoIcon(text=self._ui_modes[self._ui_mode])   
+        self.neoIcon(text=self._ui_modes[self._ui_mode])
+        self.initRotaryStart()
+        self.showFeed()    
 
     def enterConfirmMode(self):
        self.nextUiMode(0)
