@@ -15,29 +15,38 @@ class Button:
         self.long_press_time = long_press_time # мс (1 секунда)
         self.last_press_time = 0
         self.button_pressed = False
-        self.button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=self.button_handler)
+        self.prev_val = 1
+        self.val = 1
+        self.button.irq(trigger=Pin.IRQ_FALLING|Pin.IRQ_RISING, handler=self.button_handler)
 
 
     def button_handler(self,pin):
+        self.prev_val=self.val
+        self.val=pin.value()
         current_time = time.ticks_ms()
+        if self.val == self.prev_val:
+            if time.ticks_diff(current_time, self.last_press_time) > self.long_press_time:
+                self.last_press_time=current_time
+            #print('in handler point2/0 the same',self.val)
+            return
+        if time.ticks_diff(current_time, self.last_press_time) < self.debounce_time:
+            #print('in handler point2/1 timeout',self.val)
+            return
         
-        # Дебаунсинг: перевірка часу з останнього натискання
-        if time.ticks_diff(current_time, self.last_press_time) > self.debounce_time:
-            if pin.value() == 0: # Кнопка натиснута
-                self.button_pressed = True
-                self.last_press_time = current_time
-            else: # Кнопка відпущена
-                if self.button_pressed:
-                    press_duration = time.ticks_diff(current_time, self.last_press_time)
-                    if press_duration > self.long_press_time:
-                        # print("Довге натискання")
-                        if self.callback_long is not None:
-                            self.callback_long(pin,self)
-                    else:
-                        # print("Коротке натискання")
-                        if self.callback is not None:
-                            self.callback(pin,self)
-                    self.button_pressed = False
+        #print('in handler point2',self.val)
+        if self.val == 0: # Кнопка натиснута
+            self.last_press_time = current_time
+        else: # Кнопка відпущена
+                press_duration = time.ticks_diff(current_time, self.last_press_time)
+                if press_duration > self.long_press_time:
+                    # print("Довге натискання")
+                    if self.callback_long is not None:
+                        self.callback_long(pin,self)
+                else:
+                    # print("Коротке натискання")
+                    if self.callback is not None:
+                        self.callback(pin,self)
+                    
 
 
 

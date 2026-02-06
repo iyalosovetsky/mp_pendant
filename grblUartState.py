@@ -266,6 +266,7 @@ class GrblState(object):
     term_pos_from:int = 0
 
     _jog_arrow:str = ''
+    _jog_value:float = 0.0
 
     _ui_modes=['main','drive','feedJog','feedRun','confirm'] #confirm must be last
     _ui_mode=0
@@ -369,9 +370,9 @@ class GrblState(object):
             ('state', '     '    , 'white'         ,  190,  0,  2, 310-190,1, ALIGN_LEFT),
             #('icon', 'grbl'      , ICON_COLOR,    0,   0, 2, 100    ,1),
             ('term', 'F1 - Help' , 'white',             0,  40,  2, 140          ,5, ALIGN_LEFT),
-            ('<', '<<'          ,  'yellow'        ,   40, 400,  3, 60     ,1, ALIGN_LEFT),
-            ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 40+3*14,  405, 2, 220-40-3*14    ,1, ALIGN_CENTER),
-            ('>', '>>'          ,  'lblue'         ,  220, 400,  3, 60     ,1, ALIGN_LEFT),
+            ('<', '<<'          ,  'yellow'        ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
+            ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 10+3*14,  405, 2, 250-10-3*14    ,1, ALIGN_CENTER),
+            ('>', '>>'          ,  'lblue'         ,  250, 400,  3, 60     ,1, ALIGN_LEFT),
             ('info', 'info'      , 'white'         ,    0, 280,  2, 306    ,3, ALIGN_LEFT)  #6*51
         ]        
 
@@ -769,9 +770,10 @@ class GrblState(object):
       self._state_prev='stepZ'          
       #print('g_step_z now',self._dZ)  
 
-    def set_jog_arrow(self, arrow:str):
+    def set_jog_arrow(self, arrow:str, val):
       #print('new set_jog_arrow ',arrow)
       self._jog_arrow = arrow
+      self._jog_value = val
       
 
 
@@ -798,14 +800,14 @@ class GrblState(object):
          f=feedrate   
       cmd=''
       if x is not None and x!=0.0:
-        self.set_jog_arrow(('+' if x>0 else '-')+'x')
+        self.set_jog_arrow(('+' if x>0 else '-')+'x',x)
         cmd=f'$J=G91 G21 X{x} F{f}'
         #MPG -> <Idle|MPos:30.000,0.000,0.000|Bf:35,1023|FS:0,0,0|Pn:HS|WCO:0.000,0.000,0.000|WCS:G54|A:|Sc:|MPG:1|H:0|T:0|TLR:0|Sl:0.0|FW:grblHAL>
       elif y is not None and y!=0.0:
-        self.set_jog_arrow(('+' if y>0 else '-')+'y')
+        self.set_jog_arrow(('+' if y>0 else '-')+'y',y)
         cmd=f'$J=G91 G21 Y{y} F{f}'
       elif z is not None and z!=0.0:
-        self.set_jog_arrow(('+' if z>0 else '-')+'z')
+        self.set_jog_arrow(('+' if z>0 else '-')+'z',z)
         cmd=f'$J=G91 G21 Z{z} F{f}'
       if cmd !='':
           self.neoLabel(cmd,id='cmd')  
@@ -1252,7 +1254,7 @@ class GrblState(object):
            self.neoIcon(text=self._ui_modes[self._ui_mode])   
         else:
           self.neoIcon(text=('>>>' if self._jog_arrow.startswith('+') else '<<<') +
-                       ''+(' {0:.1f}'.format(self._dZ) if self._jog_arrow.endswith('z') else ' {0:.1f}'.format(self._dXY))
+                       ''+(' {0:.1f}'.format(self._jog_value))
                        #+'f={0:.0f}'.format(self._feedrate)
                        ,color=color)   
 
