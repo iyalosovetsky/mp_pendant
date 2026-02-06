@@ -88,7 +88,7 @@ C_FEED_RUN_MAX = 5000.0
 C_FEED_RUN_MIN = 20.0
 
 
-DXYZ_STEPS=[0.1,1.,10.,50.]
+DXYZ_STEPS=[0.05,0.1,1.,10.]
 FEED_JOG_STEPS=[10.,100.,200.,500.,1000.]
 FEED_RUN_STEPS=[10.,100.,200.,500.,1000.]
 
@@ -207,8 +207,8 @@ class GrblState(object):
     _wC_prev:float = 0.0
     _wpos_changed:bool  = False
 
-    _dXY:float = DXYZ_STEPS[1]
-    _dZ:float = DXYZ_STEPS[1]
+    _dXY:float = DXYZ_STEPS[2]
+    _dZ:float = DXYZ_STEPS[2]
     _feedrateJog:float =  FEED_JOG_STEPS[2]
     _feedrateRun:float =  FEED_JOG_STEPS[2]
     _mpg:bool = None
@@ -268,7 +268,7 @@ class GrblState(object):
     _jog_arrow:str = ''
     _jog_value:float = 0.0
 
-    _ui_modes=['main','drive','feedJog','feedRun','confirm'] #confirm must be last
+    _ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
     _ui_mode=0
     _ui_confirm='unkn'
     _ui_mode_prev=0
@@ -658,6 +658,12 @@ class GrblState(object):
           text='{:4.0f}'.format(self._feedrateRun)
         self.neoLabel(text,id='feed')
 
+    def showdXY(self) :     
+        print(' _dXY',self._dXY)
+
+    def showdZ(self) :     
+        print(' _dZ',self._dZ)
+
  
 
 
@@ -666,8 +672,8 @@ class GrblState(object):
         self.neoLabel(text,id='term',color=VFD_WHITE if color is None else  color)
        
     def inc_feedrateJog(self):
-      if self._feedrateJog+100.0 > C_FEED_MAX:
-           self._feedrateJog = C_FEED_MAX
+      if self._feedrateJog+100.0 > C_FEED_JOG_MAX:
+           self._feedrateJog = C_FEED_JOG_MAX
       else:    
            self._feedrateJog +=100.0
       self._state_prev='feed'
@@ -684,8 +690,8 @@ class GrblState(object):
 
 
     def inc_feedrateRun(self):
-      if self._feedrateRun+100.0 > C_FEED_MAX:
-           self._feedrateRun = C_FEED_MAX
+      if self._feedrateRun+100.0 > C_FEED_JOG_MAX:
+           self._feedrateRun = C_FEED_JOG_MAX
       else:    
            self._feedrateRun +=100.0
       self._state_prev='feed'
@@ -1375,6 +1381,12 @@ class GrblState(object):
             elif self._ui_modes[self._ui_mode] in ('feedRun'):
                 rotObj['mpos'] = self._feedrateJog
                 updated=True
+            elif self._ui_modes[self._ui_mode] in ('scaleXY'):
+                rotObj['mpos'] = self._dXY
+                updated=True                      
+            elif self._ui_modes[self._ui_mode] in ('scaleZ'):
+                rotObj['mpos'] = self._dZ
+                updated=True                      
             if not updated:
                continue    
                
@@ -1425,12 +1437,16 @@ class GrblState(object):
         if delta_val==0 :
             return
 
-        step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
+        #step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
+        
         if self.rotaryObj[rotN]['axe']=='x':
+            step = delta_val *  self._dXY
             self.grblJog(x=step, feedrate=self._feedrateJog)
         elif self.rotaryObj[rotN]['axe']=='y':
+            step = delta_val *  self._dXY
             self.grblJog(y=step, feedrate=self._feedrateJog)
         elif self.rotaryObj[rotN]['axe']=='z':
+            step = delta_val * self._dZ
             self.grblJog(z=step, feedrate=self._feedrateJog)       
 
 
@@ -1478,6 +1494,50 @@ class GrblState(object):
         self.initRotaryStart()
         self.showFeed()            
 
+    def upd_rotary_on_scaleXY(self,rotN:int):    
+        
+        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+        if delta_val==0 :
+           return
+        
+        try:
+          index = DXYZ_STEPS.index(self._dXY)
+        except ValueError:
+          print(f"The value {self._dXY} is not in the array.")
+          index = 0
+        index+=delta_val //5 +  (1 if delta_val>0 else 0) 
+        if index>=len(DXYZ_STEPS):
+           self._dXY=DXYZ_STEPS[-1]
+        elif index<0:
+           self._dXY=DXYZ_STEPS[0]
+        else:
+           self._dXY=DXYZ_STEPS[index]
+
+        self.initRotaryStart()
+        self.showdXY()  
+
+    def upd_rotary_on_scaleZ(self,rotN:int):    
+        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+        if delta_val==0 :
+           return
+        
+        try:
+          index = DXYZ_STEPS.index(self._dZ)
+        except ValueError:
+          print(f"The value {self._dZ} is not in the array.")
+          index = 0
+
+        index+=delta_val //5 +  (1 if delta_val>0 else -1) 
+        if index>=len(DXYZ_STEPS):
+           self._dZ=DXYZ_STEPS[-1]
+        elif index<0:
+           self._dZ=DXYZ_STEPS[0]
+        else:
+           self._dZ=DXYZ_STEPS[index]
+
+        self.initRotaryStart()
+        self.showdZ()          
+
 
     # task every 1s
     def upd_rotary(self):
@@ -1505,6 +1565,11 @@ class GrblState(object):
                       self.upd_rotary_on_feedJog(rotN)
                     if self._ui_modes[self._ui_mode] == 'feedRun':
                       self.upd_rotary_on_feedRun(rotN)
+                    if self._ui_modes[self._ui_mode] == 'scaleXY':
+                      self.upd_rotary_on_scaleXY(rotN)
+                    if self._ui_modes[self._ui_mode] == 'scaleZ':
+                      self.upd_rotary_on_scaleZ(rotN)
+ 
 
 
 
