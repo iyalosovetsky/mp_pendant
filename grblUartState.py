@@ -363,8 +363,10 @@ class GrblState(object):
     def neoInit(self):
         self._msg_conf = [
             ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
+            ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-30, (115-35)//2+35+10,  1, 50    ,1, ALIGN_RIGHT),
             ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
             ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
+            ('dZ', 'dZ'        , Z_ARROW_COLOR   ,  150-30, 195+40 ,  1, 50    ,1, ALIGN_RIGHT),
             ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
             ('feed', '1000 Abs WCO'    , 'white'         ,  0,  0,  2, 185,1, ALIGN_LEFT),
             ('state', '     '    , 'white'         ,  190,  0,  2, 310-190,1, ALIGN_LEFT),
@@ -433,6 +435,11 @@ class GrblState(object):
               else:    
                 ll.value(name,fgcolor=color, align=align)
               self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+            elif name in ('dXY','dZ'):
+              ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
+              textline = '{:5.2f}'.format(self._dXY if name in ('dXY') else self._dZ)
+              ll.value(textline, fgcolor=VFD_WHITE)
+              self.labels[name] = NeoLabelObj(text  = textline, color=color , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))              
             elif name in ('feed'):
               ll=Label(writer, y, x, width,fgcolor=color,bgcolor=VFD_BG, align=align)
               textline='{:4.0f}'.format(self._feedrateJog)+' Abs Mpos'
@@ -622,6 +629,15 @@ class GrblState(object):
              self.labels[id].color=VFD_LBLUE if self._mpg  else VFD_WHITE
           else:   
              self.labels[id].color=color
+        elif id in ('dXY','dZ'):
+          self.labels[id].text = '{:5.2f}'.format(self._dXY if id in ('dXY') else self._dZ)
+          if color is not None:
+             self.labels[id].color=color
+          elif color is None and ((self._ui_modes[self._ui_mode] == 'scaleZ' and id=='dZ') or (self._ui_modes[self._ui_mode] == 'scaleXY' and id=='dXY')):
+             self.labels[id].color=VFD_YELLOW 
+          else:
+             self.labels[id].color=VFD_WHITE
+             
         else:
             l_id=None
         self.neoDraw(l_id)       
@@ -660,9 +676,11 @@ class GrblState(object):
 
     def showdXY(self) :     
         print(' _dXY',self._dXY)
-
+        self.neoLabel('',id='dXY')
+         
     def showdZ(self) :     
         print(' _dZ',self._dZ)
+        self.neoLabel('{:5.2f}'.format(self._dZ),id='dZ')
 
  
 
@@ -1625,7 +1643,12 @@ class GrblState(object):
         self._ui_confirm='unkn'
         self.neoIcon(text=self._ui_modes[self._ui_mode])
         self.initRotaryStart()
-        self.showFeed()    
+        self.showFeed()
+        self.labels['dXY'].color=VFD_WHITE
+        self.labels['dZ'].color=VFD_WHITE
+
+        self.showdXY()
+        self.showdZ()
 
     def enterConfirmMode(self):
        self.nextUiMode(0)
