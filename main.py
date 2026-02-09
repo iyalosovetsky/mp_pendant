@@ -46,7 +46,7 @@ DEBUG = False
 refresh(ssd, True)
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False )
-st.set_rotary_obj(rot0,0,'x',1.0)
+st.gui.set_rotary_obj(rot0,0,'x',1.0)
 rot0.add_listener(st.rotary_listener0)
 
 
@@ -60,7 +60,7 @@ term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
 ns = Touch(isLandscape=False)
-ns.set_int_handler(st.touchscreen_press)
+ns.set_int_handler(st.gui.touchscreen_press)
 print('touch initialized')
 
 bt_red=Button(pin=Pin(17, Pin.IN, Pin.PULL_UP),callback=st.button_red_callback,callback_long=st.button_red_callback_long)
@@ -75,8 +75,8 @@ while True:
     st.p_RTLoop()
   
         
-    if st.neo_refresh:
-        st.neo_refresh=False
+    if st.gui.neo_refresh:
+        st.gui.neo_refresh=False
         refresh(ssd)##
         
     proceedCh = term_reader.read()

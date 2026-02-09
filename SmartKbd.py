@@ -137,7 +137,7 @@ class SmartKbd(object):
 
     def objGrblStateSetter(self,grblStateObj):
         self.grblStateObj = grblStateObj
-        self.grblStateObj.setEdit(self.grblCommand)
+        self.grblStateObj.gui.setEdit(self.grblCommand)
 
  
     @staticmethod
@@ -146,22 +146,22 @@ class SmartKbd(object):
     
     def backspace(self):
         self.grblCommand =self.grblCommand[0:-1]
-        self.grblStateObj.setEdit(self.grblCommand)
+        self.grblStateObj.gui.setEdit(self.grblCommand)
 
     
     def put_char(self, char):
         self.grblCommand +=char
-        self.grblStateObj.setEdit(self.grblCommand)
+        self.grblStateObj.gui.setEdit(self.grblCommand)
 
     def space(self):
         self.put_char(' ')  
-        self.grblStateObj.setEdit(self.grblCommand)
+        self.grblStateObj.gui.setEdit(self.grblCommand)
 
 
     def clear(self):
         self.grblPrevCommand=self.grblCommand
         self.grblCommand = ''
-        self.grblStateObj.setEdit(self.grblCommand)  
+        self.grblStateObj.gui.setEdit(self.grblCommand)  
 
     def set_macro(self, key:str):
         self.grblMacro[key]=self.grblCommand
@@ -171,7 +171,7 @@ class SmartKbd(object):
     def get_macro(self, key:str):
         self.clear()
         self.grblCommand=self.grblMacro.get(key,'')
-        self.grblStateObj.setEdit(self.grblCommand)
+        self.grblStateObj.gui.setEdit(self.grblCommand)
         return self.grblCommand
         
     def get(self):
