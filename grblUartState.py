@@ -33,7 +33,7 @@ RUN_NOW_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 
 
 MAX_BUFFER_SIZE = 200
-
+ 
 
 
 objgrblState=None
@@ -111,7 +111,9 @@ class GrblState(object):
       '_wcs':  '', #Work Coordinate System (WCS)
       '_wcs_prev':  '', #Work Coordinate System (WCS)
       '_state':  'Idle',
-      '_state_prev':  'unk'
+      '_state_prev':  'unk', 
+      '_grbl_display_state': '', # text in chevron
+      '_grbl_info': '' # text in bracket
     }
     
     _wpos_changed:bool  = False
@@ -138,8 +140,6 @@ class GrblState(object):
     # timeDelta2query:int = GRBL_QUERY_INTERVAL_IDLE
     _state_is_changed:bool = False
     _state_time_change:int = time.time_ns()
-    grbl_display_state:str = '' # text in chevron
-    grbl_info:str = '' # text in bracket
     _grblExecProgress:str = 'init'
     # gotQuery:bool = False
 
@@ -175,6 +175,9 @@ class GrblState(object):
                   ) :
         global objgrblState
         objgrblState=self
+        self.debug = debug
+        self.neo = neo        
+        self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug)
         self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
         self.rt['query4MPG'] = {'last_start': time.time_ns (), 'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
         self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
@@ -185,9 +188,7 @@ class GrblState(object):
 
 
 
-        self.debug = debug
-        
-        self.neo = neo
+
         #uarIn
         self.uart_grbl_mpg = uart_grbl_mpg
         
@@ -213,7 +214,7 @@ class GrblState(object):
         
         if  self.uart_grbl_mpg!=None :
             self.uart_grbl_mpg.irq(handler=uart_callback, trigger=UART.IRQ_RXIDLE, hard=False) # 'hard=False' is often required
-        self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug)
+        
         
 
         
@@ -273,8 +274,11 @@ class GrblState(object):
 
     #jog $J=G91 X0 Y-5 F600
     #$J=G91 X1 F100000
+    #G10L20P1Y0 work pos zero
 
-
+    def mpgCommandShow(self, command:str):
+          self.gui.neoLabel(command,id='cmd')  
+          self.mpgCommand(command+'\r\n')  
     
     def toggleMPG(self):
         self.gui.neoLabel("#",id='cmd')
@@ -283,10 +287,7 @@ class GrblState(object):
         self.query_now('toggleMPG')
 
     def query4MPG(self):
-        #print('point2/0',self._query4MPG_countDown,self.grblParams['_mpg'], self.MPG_time2query , time.time_ns(),self.MPG_time2query > time.time_ns()+MPG_INTERVAL)
-        # if (self.grblParams['_mpg'] is None or self.grblParams['_mpg']==0) and self._query4MPG_countDown>0 and self.MPG_time2query < time.time_ns()+MPG_INTERVAL:
         if (self.grblParams['_mpg'] is None or self.grblParams['_mpg']==0) and self._query4MPG_countDown>0 :
-           #  self.MPG_time2query=time.time_ns()
            self._query4MPG_countDown -= 1
            self.toggleMPG()
            
@@ -312,76 +313,61 @@ class GrblState(object):
                 self.sendedQuery2grblCounter = 0
                 self.gui.neoLabel('',id='cmd')
       elif command=='-y':
-          self.grblJog(y=-self.step)
+          self.gui.grblJog(y=-self.step)
       elif  command=='+y':
-          self.grblJog(y=self.step)
+          self.gui.grblJog(y=self.step)
       elif command=='-x':
-          self.grblJog(x=-self.step)
+          self.gui.grblJog(x=-self.step)
       elif  command=='+x':
-          self.grblJog(x=self.step)
+          self.gui.grblJog(x=self.step)
       elif command=='-z':
-          self.grblJog(z=-self.stepdZ) 
+          self.gui.grblJog(z=-self.stepdZ) 
       elif  command=='+z':
-          self.grblJog(z=self.stepdZ)
+          self.gui.grblJog(z=self.stepdZ)
       elif command=='-feed' : 
-          self.dec_feedrateJog()
+          self.gui.dec_feedrateJog()
           self.gui.neoIcon('feed {0:.0f}'.format(self._feedrateJog))
       elif command=='+feed':
-          self.inc_feedrateJog()
+          self.gui.inc_feedrateJog()
           self.gui.neoIcon('feed {0:.0f}'.format(self._feedrateJog))
+      elif command in ('zeroX','zeroY','zeroZ'):
+          cmd='G10L20P1{axe}0'.format(axe=command[-1:])
+          self.mpgCommandShow(cmd)  
       elif command=='-stepXY' :    
-          self.dec_stepXY()
+          self.gui.dec_stepXY()
           if self._dXY<1:
             self.gui.neoIcon('dX {0:.1f}'.format(self._dXY).replace('.',','))
           else:  
              self.gui.neoIcon('dX {0:.0f}'.format(self._dXY))
       elif command=='+stepXY' :    
-          self.inc_stepXY()
+          self.gui.inc_stepXY()
           if self._dXY<1:
             self.gui.neoIcon('dX {0:.1f}'.format(self._dXY).replace('.',','))
           else:  
              self.gui.neoIcon('dX {0:.0f}'.format(self._dXY))
       elif command=='-stepZ' :    
-          self.dec_stepZ()
+          self.gui.dec_stepZ()
           if self._dZ<1:
             self.gui.neoIcon('dZ {0:.1f}'.format(self._dZ).replace('.',','))
           else:  
              self.gui.neoIcon('dZ {0:.0f}'.format(self._dZ))
       elif command=='+stepZ' :    
-          self.inc_stepZ()
+          self.gui.inc_stepZ()
           if self._dZ<1:
             self.gui.neoIcon('dZ {0:.1f}'.format(self._dZ).replace('.',','))
           else:  
              self.gui.neoIcon('dZ {0:.0f}'.format(self._dZ))
       elif command=='stepXY' :    
-          self.stepXY()
+          self.gui.stepXY()
           self.gui.neoIcon('dXY\n{0:.1f}'.format(self._dXY))
       elif command=='stepZ' :    
           self.stepZ()
           self.gui.neoIcon('dZ\n{0:.1f}'.format(self._dZ))
       elif command=='feed' : 
-          self.set_feedrate()
+          self.gui.set_feedrate()
           self.gui.neoIcon('feed\n{0:.0f}'.format(self._feedrateJog))
-      elif command=='termLineUp' : 
-          self.decTermLinePos()
-          if len(self.grbl_info)>0:
-            self.gui.neoTerm(self.grbl_info)
-      elif command=='termLineDown' : 
-          self.incTermLinePos()
-          if len(self.grbl_info)>0:
-            self.gui.neoTerm(self.grbl_info) 
-      elif command=='termLineLeft' : 
-          self.decTermPos()
-          if len(self.grbl_info)>0:
-            self.gui.neoTerm(self.grbl_info)
-      elif command=='termLineRight' : 
-          self.incTermPos()
-          if len(self.grbl_info)>0:
-            self.gui.neoTerm(self.grbl_info)           
-      elif command=='termHome' : 
-          self.homeTermPos()
-          if len(self.grbl_info)>0:
-            self.gui.neoTerm(self.grbl_info)   
+      elif command in ('termLineUp', 'termLineDown', 'termLineLeft', 'termLineRight', 'termHome') : 
+            self.gui.neoTermInfo(command)   
       elif command in ('#'):  
         self.toggleMPG()
       elif command in ('cancel'):  
@@ -496,29 +482,7 @@ class GrblState(object):
     #     return l_nq
 
 
-    @property
-    def step(self):
-        return self._dXY          
-
-    @property
-    def stepdZ(self):
-        return self._dZ          
-
-    @property
-    def mpg(self):
-        return self.grblParams['_mpg']    
-    
-    @property
-    def mpg_prev(self):
-        return self.grblParams['_mpg_prev']
-    
-    @property
-    def state(self):
-        return self.grblParams['_state']  
-    
-    @property
-    def state_prev(self):
-        return self.grblParams['_state_prev']     
+   
     
     def state_is_changed(self):
         l_changed = self._state_is_changed
@@ -566,11 +530,11 @@ class GrblState(object):
           return          
         # general purpose state parsing      
         elif lineStateIn.find('<')>=0 and lineStateIn.find('>')>=0 and  lineStateIn.find('<')<lineStateIn.find('>')>=0 :
-            self.grbl_display_state = lineStateIn[lineStateIn.find('<'):lineStateIn.find('>')+1]
+            self.grblParams['_grbl_display_state'] = lineStateIn[lineStateIn.find('<'):lineStateIn.find('>')+1]
 
             l_state = None 
 
-            for ii,token in enumerate(self.grbl_display_state[1:-1].lower().split('|')):
+            for ii,token in enumerate(self.grblParams['_grbl_display_state'][1:-1].lower().split('|')):
                 if ii==0 : # state the first token
                   l_state = token
                 else:
@@ -584,9 +548,9 @@ class GrblState(object):
                         
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
                         self.changeMpos(elem[1].split(','))
-                    elif  len(elem)>1 and elem[0]=='WCO' and elem[1] is not None:       
+                    elif  len(elem)>1 and elem[0]=='wco' and elem[1] is not None:
                         self.changeWCO(elem[1].split(','))
-                    elif  len(elem)>=1 and elem[0]=='WCS' and elem[1] is not None:       
+                    elif  len(elem)>=1 and elem[0]=='wcs' and elem[1] is not None:       
                         self.changeWCS(elem[1])                            
             if l_state is not None:
                  self.changeState(l_state)            
@@ -595,14 +559,14 @@ class GrblState(object):
         
         elif lineStateIn.find('[')>=0 and lineStateIn.find(']')>=0 and  lineStateIn.find('[')<lineStateIn.find(']')>=0 :
             lineStateIn=lineStateIn[lineStateIn.find('['):lineStateIn.find('[')+1]
-            self.grbl_info=lineStateIn
+            self.grblParams['_grbl_info']=lineStateIn
             if lineStateIn.count('Unlocked')>0:
               self.changeState('unlocked')
               self._grblExecProgress='done'
             self._parse_state_code='done'  
             return
         elif  lineStateIn.startswith('$')  :
-          self.grbl_info=lineStateIn           
+          self.grblParams['_grbl_info']=lineStateIn           
           self._parse_state_code='done'
           return
         else:
@@ -649,58 +613,7 @@ class GrblState(object):
         self.gui.neo_refresh= True
 
 
-    def displayState(self,grblState:str):     
-
-      self.parseState(grblState)
-      # print("MPG ->",grblState,' \n - >> prev ',self.state_prev, self.mpg_prev,' now=>',self.state, self.mpg)
-      self.gui.neoLabel(self.grbl_display_state,id='info')
-      
-      if len(self.grbl_info)>0:
-         self.gui.neoTerm(self.grbl_info)
-         
-      self.gui.neoLabel('{0:.2f}'.format(self.grblParams['_mX']),id='x')
-      self.gui.neoLabel('{0:.2f}'.format(self.grblParams['_mY']),id='y')
-      self.gui.neoLabel('{0:.2f}'.format(self.grblParams['_mZ']),id='z')
-      
-      
-      
-      
-      if self.mpg is not None and (self.mpg_prev is None or self.mpg !=self.mpg_prev):
-          self.grblParams['_mpg_prev']=self.grblParams['_mpg']
-      if self.state_is_changed() or self.state == 'idle' or self.state.startswith('hold') :  
-              if self.state.startswith('alarm'):
-                  self._jog_arrow = ''
-                  self.gui.neoDisplayJog()
-                  self.gui.neoIcon('Alarm\n^\nshft+6')
-                  self.gui.neoLabel(self.state,id='state')
-              elif self.state == 'run':    
-                  self.gui.neoLabel(self.state,id='state')
-                  self.gui.neoIcon('Run')
-              elif self.state == 'jog':    
-                  self.gui.neoLabel(self.state,id='state')
-                  self.gui.neoDisplayJog()
-                  #self.gui.neoIcon('Jog')
-              elif self.state=='unlocked':
-                  self.gui.neoLabel(self.state,id='state')
-              elif self.state=='hold:1':
-                  self.gui.neoLabel(self.state,id='state')
-              elif self.state=='hold:0':
-                  #self.flashKbdLEDs(LED_NUMLOCK , BLINK_5)
-                  # self.neoInfo(self.state)  
-                  self.gui.neoLabel(self.state,id='state')
-              elif self.state.startswith('error'): 
-                  self._jog_arrow = ''
-                  self.gui.neoDisplayJog() 
-                  # self.neoError('err')  
-                  #self.flashKbdLEDs(LED_CAPSLOCK , BLINK_5) 
-                  self.gui.neoLabel(self.state,id='state')
-              elif self.state == 'idle' :
-                  self._jog_arrow = ''
-                  self.gui.neoDisplayJog()    
-                  #self.flashKbdLEDs(LED_ALL , NOBLINK) 
-                  # self.neoIdle()
-                  self.gui.neoLabel(self.state,id='state')
-    
+   
 
 
 
@@ -723,7 +636,8 @@ class GrblState(object):
             if self.debug:
                 print(chars.decode())
             self.bufferUartIn[self.bufferUartPos]=chars.decode()
-            self.displayState(self.bufferUartIn[self.bufferUartPos])
+            self.parseState(self.bufferUartIn[self.bufferUartPos])
+            self.gui.displayState()
             self.bufferUartPrev=self.bufferUartPos
             if self.bufferUartPos>=len(self.bufferUartIn)-1:
                 self.bufferUartPos=0
@@ -743,7 +657,7 @@ class GrblState(object):
 
     
     
-    # event when grbl pos changed
+    # event when grbl machine pos changed
     def changeMpos(self, xyz):
       if len(xyz)==3:
         self.grblParams['_mX_prev'], self.grblParams['_mY_prev'],self.grblParams['_mZ_prev'] = (self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'])
@@ -772,38 +686,39 @@ class GrblState(object):
 
 
  
-    # event when grbl pos changed
+    # event when grbl work cordinate area pos changed
     def changeWCO(self, xyz):
       if len(xyz)==3:
-        self._wX_prev, self._wY_prev,self._wZ_prev = (self._wX, self._wY,self._wZ)
-        self._wX, self._wY,self._wZ = [ float(xx) for xx in xyz ]
+        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'])
+        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'] = [ float(xx) for xx in xyz ]
         self._wpos_changed = True
       elif len(xyz)==4:
-        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev = (self._wX, self._wY,self._wZ,self._wA)
-        self._wX, self._wY,self._wZ,self._wA = [ float(xx) for xx in xyz ]  
+        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'])
+        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'] = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
       elif len(xyz)==5:
-        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev,self._wB_prev = (self._wX, self._wY,self._wZ,self._wA,self._wB)
-        self._wX, self._wY,self._wZ,self._wA,self._wB = [ float(xx) for xx in xyz ]  
+        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'],self.grblParams['_wB_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'])
+        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'] = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
       elif len(xyz)==6:
-        self._wX_prev, self._wY_prev,self._wZ_prev,self._wA_prev,self._wB_prev,self._wC_prev = (self._wX, self._wY,self._wZ,self._wA,self._wB,self._wC)
-        self._wX, self._wY,self._wZ,self._wA,self._wB,self._wC = [ float(xx) for xx in xyz ]  
+        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'],self.grblParams['_wB_prev'],self.grblParams['_wC_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'],self.grblParams['_wC'])
+        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'],self.grblParams['_wC'] = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
 
-      self._wpos_changed = (self._wX_prev != self._wX or self._wY_prev != self._wY or self._wZ_prev != self._wZ)
+      self._wpos_changed = (self.grblParams['_wX_prev'] != self.grblParams['_wX'] or self.grblParams['_wY_prev'] != self.grblParams['_wY'] or self.grblParams['_wZ_prev'] != self.grblParams['_wZ'])
       if self._wpos_changed:
-         print('changeWpos:', self._wX, self._wY, self._wZ)
+         print('changeWpos:', self.grblParams['_wX'], self.grblParams['_wY'], self.grblParams['_wZ'])
          self.gui.neo_refresh= True
 
 
     def changeWCS(self, wcs):
-      self._wcs_prev = self._wcs
-      self._wcs = wcs
-      self._wcs_changed = (self._wcs_prev != self._wcs)
+      self.grblParams['_wcs_prev'] = self.grblParams['_wcs']
+      self.grblParams['_wcs'] = wcs
+      self._wcs_changed = (self.grblParams['_wcs_prev'] != self.grblParams['_wcs'])
       if self._wcs_changed:
-         print('changeWCS:', self._wcs)
+         print('changeWCS:', self.grblParams['_wcs'])
          self.gui.neo_refresh= True
+            
 
     # callback for rotary 0 (x)
     def rotary_listener0(self):
@@ -861,4 +776,13 @@ class GrblState(object):
 
     def button_yellow_callback_long(self,pin ,button):
         print('button_yellow_callback_long')
+        if self._grblExecProgress in ('do','doing','alarm','error'):
+            print ('button_yellow_callback_long: scip on _grblExecProgress=',self._grblExecProgress)
+            return        
+        if self.gui._ui_modes[self.gui._ui_mode] in ( 'main'):
+          print('button_yellow_callback_long point2')
+          if self.gui.rotaryObj[0]['axe'] in ('x','y','z'):
+            print('button_yellow_callback_long point3')
+            self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
+
 

@@ -7,7 +7,7 @@ from machine import Pin
 
 class Button:
 
-    def __init__(self, pin, callback=None,callback_long=None, debounce_time=200, long_press_time=1000):
+    def __init__(self, pin, callback=None,callback_long=None, debounce_time=200, long_press_time=400): 
         self.button = pin
         self.callback = callback
         self.callback_long = callback_long
