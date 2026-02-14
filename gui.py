@@ -71,7 +71,7 @@ DEBUG= False
 
 class NeoLabelObj(object):
     def __init__(self, fgcolor:int , scale:float,x:int,y:int,text:str = '',label=None,fldLabel=None,
-                 width:int=100,oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT, bdcolor=None, invert=False, hidden = False):
+                 oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT, bdcolor=None, invert=False, hidden = False):
         self.x= x
         self.y= y
         self.text=  text
@@ -360,6 +360,7 @@ class Gui(object ):
              self.labels[id].fgcolor=color
         elif id in ('dXY','dZ'):
           #self.labels[id].text = '{:5.2f}'.format(self._dXY if id in ('dXY') else self._dZ)
+          self.labels[id].text = text
           if color is not None:
              self.labels[id].fgcolor=color
           elif color is None and ((self._ui_modes[self._ui_mode] == 'scaleZ' and id=='dZ') or (self._ui_modes[self._ui_mode] == 'scaleXY' and id=='dXY')):
@@ -851,7 +852,7 @@ class Gui(object ):
         if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
            return        
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
-        if delta_val==0 :
+        if abs(delta_val)<2 :
            return
         
         try:
@@ -859,7 +860,9 @@ class Gui(object ):
         except ValueError:
           print(f"The value {self._dXY} is not in the array.")
           index = 0
-        index+=delta_val //5 +  (1 if delta_val>0 else 0) 
+        print(' _dXY index1',index)  
+        index+=(1 if delta_val>0 else -1)
+        print(' _dXY index2',index)  
         if index>=len(DXYZ_STEPS):
            self._dXY=DXYZ_STEPS[-1]
         elif index<0:
@@ -869,6 +872,8 @@ class Gui(object ):
 
         self.initRotaryStart()
         self.showdXY()  
+        
+        
 
     def upd_rotary_on_scaleZ(self,rotN:int):
         if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
@@ -883,7 +888,7 @@ class Gui(object ):
           print(f"The value {self._dZ} is not in the array.")
           index = 0
 
-        index+=delta_val //5 +  (1 if delta_val>0 else -1) 
+        index+=(1 if delta_val>0 else -1)  
         if index>=len(DXYZ_STEPS):
            self._dZ=DXYZ_STEPS[-1]
         elif index<0:
@@ -893,6 +898,7 @@ class Gui(object ):
 
         self.initRotaryStart()
         self.showdZ()          
+        
 
 
 
@@ -905,7 +911,6 @@ class Gui(object ):
         self.neoLabel(text,id='feed')
 
     def showdXY(self) :     
-        print(' _dXY',self._dXY)
         self.neoLabel('{:5.2f}'.format(self._dXY),id='dXY')
          
     def showdZ(self) :     
