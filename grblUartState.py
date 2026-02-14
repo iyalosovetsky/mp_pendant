@@ -4,6 +4,58 @@ import machine
 from machine import UART
 from gui import Gui, VFD_YELLOW, VFD_LBLUE,VFD_WHITE
 
+
+class GrblParams:
+    """
+    A class to hold grbl parameters.
+    Using __slots__ for memory optimization.
+    """
+    __slots__ = [
+        '_mX', '_mY', '_mZ', '_mA', '_mB', '_mC',
+        '_mX_prev', '_mY_prev', '_mZ_prev', '_mA_prev', '_mB_prev', '_mC_prev',
+        '_wX', '_wY', '_wZ', '_wA', '_wB', '_wC',
+        '_wX_prev', '_wY_prev', '_wZ_prev', '_wA_prev', '_wB_prev', '_wC_prev',
+        '_mpg', '_mpg_prev', '_wcs', '_wcs_prev', '_state', '_state_prev',
+        '_grbl_display_state', '_grbl_info'
+    ]
+
+    def __init__(self):
+        self._mX = 0.0
+        self._mY = 0.0
+        self._mZ = 0.0
+        self._mA = 0.0
+        self._mB = 0.0
+        self._mC = 0.0
+
+        self._mX_prev = 0.0
+        self._mY_prev = 0.0
+        self._mZ_prev = 0.0
+        self._mA_prev = 0.0
+        self._mB_prev = 0.0
+        self._mC_prev = 0.0
+
+        self._wX = 0.0
+        self._wY = 0.0
+        self._wZ = 0.0
+        self._wA = 0.0
+        self._wB = 0.0
+        self._wC = 0.0
+
+        self._wX_prev = 0.0
+        self._wY_prev = 0.0
+        self._wZ_prev = 0.0
+        self._wA_prev = 0.0
+        self._wB_prev = 0.0
+        self._wC_prev = 0.0
+        
+        self._mpg = None
+        self._mpg_prev = ''
+        self._wcs = ''
+        self._wcs_prev = ''
+        self._state = 'Idle'
+        self._state_prev = 'unk'
+        self._grbl_display_state = ''
+        self._grbl_info = ''
  
 
 BLINK_2 = 1
@@ -77,44 +129,7 @@ class GrblState(object):
     rt={} # real time tasks
 
     helpIdx=-1
-    grblParams={
-      '_mX': 0.0,
-      '_mY': 0.0,
-      '_mZ': 0.0,
-      '_mA': 0.0,
-      '_mB': 0.0,
-      '_mC': 0.0,
-
-      '_mX_prev': 0.0,
-      '_mY_prev': 0.0,
-      '_mZ_prev': 0.0,
-      '_mA_prev': 0.0,
-      '_mB_prev': 0.0,
-      '_mC_prev': 0.0,
-
-      '_wX': 0.0,
-      '_wY': 0.0,
-      '_wZ': 0.0,
-      '_wA': 0.0,
-      '_wB': 0.0,
-      '_wC': 0.0,
-
-      '_wX_prev': 0.0,
-      '_wY_prev': 0.0,
-      '_wZ_prev': 0.0,
-      '_wA_prev': 0.0,
-      '_wB_prev': 0.0,
-      '_wC_prev': 0.0,
-      
-      '_mpg':   None,
-      '_mpg_prev': '',
-      '_wcs':  '', #Work Coordinate System (WCS)
-      '_wcs_prev':  '', #Work Coordinate System (WCS)
-      '_state':  'Idle',
-      '_state_prev':  'unk', 
-      '_grbl_display_state': '', # text in chevron
-      '_grbl_info': '' # text in bracket
-    }
+    grblParams=GrblParams()
     
     _wpos_changed:bool  = False
     _mpos_changed:bool  = False
@@ -287,7 +302,7 @@ class GrblState(object):
         self.query_now('toggleMPG')
 
     def query4MPG(self):
-        if (self.grblParams['_mpg'] is None or self.grblParams['_mpg']==0) and self._query4MPG_countDown>0 :
+        if (self.grblParams._mpg is None or self.grblParams._mpg==0) and self._query4MPG_countDown>0 :
            self._query4MPG_countDown -= 1
            self.toggleMPG()
            
@@ -530,20 +545,20 @@ class GrblState(object):
           return          
         # general purpose state parsing      
         elif lineStateIn.find('<')>=0 and lineStateIn.find('>')>=0 and  lineStateIn.find('<')<lineStateIn.find('>')>=0 :
-            self.grblParams['_grbl_display_state'] = lineStateIn[lineStateIn.find('<'):lineStateIn.find('>')+1]
+            self.grblParams._grbl_display_state = lineStateIn[lineStateIn.find('<'):lineStateIn.find('>')+1]
 
             l_state = None 
 
-            for ii,token in enumerate(self.grblParams['_grbl_display_state'][1:-1].lower().split('|')):
+            for ii,token in enumerate(self.grblParams._grbl_display_state[1:-1].lower().split('|')):
                 if ii==0 : # state the first token
                   l_state = token
                 else:
                     elem = token.split(':')
                     if len(elem)>1 and elem[0]=='mpg' and elem[1] is not None and (elem[1]=='1' or elem[1]=='0'):
-                        self.grblParams['_mpg_prev']=self.grblParams['_mpg']
-                        self.grblParams['_mpg']=(elem[1]=='1')
-                        self.gui.labels['info'].color=VFD_LBLUE if self.grblParams['_mpg']  else VFD_WHITE
-                        if self.grblParams['_mpg']==1:
+                        self.grblParams._mpg_prev=self.grblParams._mpg
+                        self.grblParams._mpg=(elem[1]=='1')
+                        self.gui.labels['info'].color=VFD_LBLUE if self.grblParams._mpg  else VFD_WHITE
+                        if self.grblParams._mpg==1:
                             self._query4MPG_countDown = 0
                         
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
@@ -559,14 +574,14 @@ class GrblState(object):
         
         elif lineStateIn.find('[')>=0 and lineStateIn.find(']')>=0 and  lineStateIn.find('[')<lineStateIn.find(']')>=0 :
             lineStateIn=lineStateIn[lineStateIn.find('['):lineStateIn.find('[')+1]
-            self.grblParams['_grbl_info']=lineStateIn
+            self.grblParams._grbl_info=lineStateIn
             if lineStateIn.count('Unlocked')>0:
               self.changeState('unlocked')
               self._grblExecProgress='done'
             self._parse_state_code='done'  
             return
         elif  lineStateIn.startswith('$')  :
-          self.grblParams['_grbl_info']=lineStateIn           
+          self.grblParams._grbl_info=lineStateIn           
           self._parse_state_code='done'
           return
         else:
@@ -596,16 +611,16 @@ class GrblState(object):
           self.parseStateOne(item)
 
     def changeState(self,newState:str):
-        prv = self.grblParams['_state_prev']
-        self.grblParams['_state_prev'] = self.grblParams['_state']
-        self.grblParams['_state'] = newState
-        self._state_is_changed = (prv is None or  prv != self.grblParams['_state'])     
+        prv = self.grblParams._state_prev
+        self.grblParams._state_prev = self.grblParams._state
+        self.grblParams._state = newState
+        self._state_is_changed = (prv is None or  prv != self.grblParams._state)     
         self._state_time_change = time.time_ns()
-        if (self.grblParams['_state'].startswith('run') or self.grblParams['_state'].startswith('jog')) or self._state_is_changed  :
+        if (self.grblParams._state.startswith('run') or self.grblParams._state.startswith('jog')) or self._state_is_changed  :
             self.p_RTSetNewInterval('autoQuery2grbl',GRBL_QUERY_INTERVAL_RUN)
-        elif not (self.grblParams['_state'].startswith('run') or self.grblParams['_state'].startswith('jog')) :
+        elif not (self.grblParams._state.startswith('run') or self.grblParams._state.startswith('jog')) :
             self.p_RTSetNewInterval('autoQuery2grbl',GRBL_QUERY_INTERVAL_IDLE)
-        if self._grblExecProgress in ('do','doing','alarm','error') and (self.grblParams['_state'].startswith('idle') or self.grblParams['_state'].startswith('alarm')) :
+        if self._grblExecProgress in ('do','doing','alarm','error') and (self.grblParams._state.startswith('idle') or self.grblParams._state.startswith('alarm')) :
             self._grblExecProgress='done'
             # set rotary to initial
             if self.gui._ui_modes[self.gui._ui_mode] in ( 'main', 'drive'):
@@ -660,23 +675,23 @@ class GrblState(object):
     # event when grbl machine pos changed
     def changeMpos(self, xyz):
       if len(xyz)==3:
-        self.grblParams['_mX_prev'], self.grblParams['_mY_prev'],self.grblParams['_mZ_prev'] = (self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'])
-        self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'] = [ float(xx) for xx in xyz ]
+        self.grblParams._mX_prev, self.grblParams._mY_prev,self.grblParams._mZ_prev = (self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ)
+        self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ = [ float(xx) for xx in xyz ]
         self._mPosInited:bool = True
       elif len(xyz)==4:
-        self.grblParams['_mX_prev'], self.grblParams['_mY_prev'],self.grblParams['_mZ_prev'],self.grblParams['_mA_prev'] = (self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'])
-        self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._mX_prev, self.grblParams._mY_prev,self.grblParams._mZ_prev,self.grblParams._mA_prev = (self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA)
+        self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA = [ float(xx) for xx in xyz ]  
         self._mPosInited:bool = True
       elif len(xyz)==5:
-        self.grblParams['_mX_prev'], self.grblParams['_mY_prev'],self.grblParams['_mZ_prev'],self.grblParams['_mA_prev'],self.grblParams['_mB_prev'] = (self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'],self.grblParams['_mB'])
-        self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'],self.grblParams['_mB'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._mX_prev, self.grblParams._mY_prev,self.grblParams._mZ_prev,self.grblParams._mA_prev,self.grblParams._mB_prev = (self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA,self.grblParams._mB)
+        self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA,self.grblParams._mB = [ float(xx) for xx in xyz ]  
         self._mPosInited:bool = True
       elif len(xyz)==6:
-        self.grblParams['_mX_prev'], self.grblParams['_mY_prev'],self.grblParams['_mZ_prev'],self.grblParams['_mA_prev'],self.grblParams['_mB_prev'],self.grblParams['_mC_prev'] = (self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'],self.grblParams['_mB'],self.grblParams['_mC'])
-        self.grblParams['_mX'], self.grblParams['_mY'],self.grblParams['_mZ'],self.grblParams['_mA'],self.grblParams['_mB'],self.grblParams['_mC'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._mX_prev, self.grblParams._mY_prev,self.grblParams._mZ_prev,self.grblParams._mA_prev,self.grblParams._mB_prev,self.grblParams._mC_prev = (self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA,self.grblParams._mB,self.grblParams._mC)
+        self.grblParams._mX, self.grblParams._mY,self.grblParams._mZ,self.grblParams._mA,self.grblParams._mB,self.grblParams._mC = [ float(xx) for xx in xyz ]  
         self._mPosInited:bool = True
 
-      self._mpos_changed = (self.grblParams['_mX_prev'] != self.grblParams['_mX'] or self.grblParams['_mY_prev'] != self.grblParams['_mY'] or self.grblParams['_mZ_prev'] != self.grblParams['_mZ'])
+      self._mpos_changed = (self.grblParams._mX_prev != self.grblParams._mX or self.grblParams._mY_prev != self.grblParams._mY or self.grblParams._mZ_prev != self.grblParams._mZ)
       if self._mpos_changed:
          #print('changeMpos:')
          if self.gui._ui_modes[self.gui._ui_mode] in ( 'main', 'drive'):
@@ -689,34 +704,34 @@ class GrblState(object):
     # event when grbl work cordinate area pos changed
     def changeWCO(self, xyz):
       if len(xyz)==3:
-        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'])
-        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'] = [ float(xx) for xx in xyz ]
+        self.grblParams._wX_prev, self.grblParams._wY_prev,self.grblParams._wZ_prev = (self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ)
+        self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ = [ float(xx) for xx in xyz ]
         self._wpos_changed = True
       elif len(xyz)==4:
-        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'])
-        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._wX_prev, self.grblParams._wY_prev,self.grblParams._wZ_prev,self.grblParams._wA_prev = (self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA)
+        self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
       elif len(xyz)==5:
-        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'],self.grblParams['_wB_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'])
-        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._wX_prev, self.grblParams._wY_prev,self.grblParams._wZ_prev,self.grblParams._wA_prev,self.grblParams._wB_prev = (self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA,self.grblParams._wB)
+        self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA,self.grblParams._wB = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
       elif len(xyz)==6:
-        self.grblParams['_wX_prev'], self.grblParams['_wY_prev'],self.grblParams['_wZ_prev'],self.grblParams['_wA_prev'],self.grblParams['_wB_prev'],self.grblParams['_wC_prev'] = (self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'],self.grblParams['_wC'])
-        self.grblParams['_wX'], self.grblParams['_wY'],self.grblParams['_wZ'],self.grblParams['_wA'],self.grblParams['_wB'],self.grblParams['_wC'] = [ float(xx) for xx in xyz ]  
+        self.grblParams._wX_prev, self.grblParams._wY_prev,self.grblParams._wZ_prev,self.grblParams._wA_prev,self.grblParams._wB_prev,self.grblParams._wC_prev = (self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA,self.grblParams._wB,self.grblParams._wC)
+        self.grblParams._wX, self.grblParams._wY,self.grblParams._wZ,self.grblParams._wA,self.grblParams._wB,self.grblParams._wC = [ float(xx) for xx in xyz ]  
         self._wpos_changed = True
 
-      self._wpos_changed = (self.grblParams['_wX_prev'] != self.grblParams['_wX'] or self.grblParams['_wY_prev'] != self.grblParams['_wY'] or self.grblParams['_wZ_prev'] != self.grblParams['_wZ'])
+      self._wpos_changed = (self.grblParams._wX_prev != self.grblParams._wX or self.grblParams._wY_prev != self.grblParams._wY or self.grblParams._wZ_prev != self.grblParams._wZ)
       if self._wpos_changed:
-         print('changeWpos:', self.grblParams['_wX'], self.grblParams['_wY'], self.grblParams['_wZ'])
+         print('changeWpos:', self.grblParams._wX, self.grblParams._wY, self.grblParams._wZ)
          self.gui.neo_refresh= True
 
 
     def changeWCS(self, wcs):
-      self.grblParams['_wcs_prev'] = self.grblParams['_wcs']
-      self.grblParams['_wcs'] = wcs
-      self._wcs_changed = (self.grblParams['_wcs_prev'] != self.grblParams['_wcs'])
+      self.grblParams._wcs_prev = self.grblParams._wcs
+      self.grblParams._wcs = wcs
+      self._wcs_changed = (self.grblParams._wcs_prev != self.grblParams._wcs)
       if self._wcs_changed:
-         print('changeWCS:', self.grblParams['_wcs'])
+         print('changeWCS:', self.grblParams._wcs)
          self.gui.neo_refresh= True
             
 
@@ -747,8 +762,8 @@ class GrblState(object):
 
 
     def button_red_callback(self,pin,button): # right key
-        print('button_red_callback  self._grblExecProgress=', self._grblExecProgress, self.grblParams['_state'])
-        if self._grblExecProgress in ('do','doing','alarm','error') or self.grblParams['_state'] in ('alarm','error') :
+        print('button_red_callback  self._grblExecProgress=', self._grblExecProgress, self.grblParams._state)
+        if self._grblExecProgress in ('do','doing','alarm','error') or self.grblParams._state in ('alarm','error') :
           self.send2grblOne('cancel')
           self.send2grblOne('^')
           #machine.soft_reset()
@@ -784,5 +799,3 @@ class GrblState(object):
           if self.gui.rotaryObj[0]['axe'] in ('x','y','z'):
             print('button_yellow_callback_long point3')
             self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
-
-

@@ -120,7 +120,7 @@ class Gui(object ):
 
     _jog_arrow:str = ''
     _jog_value:float = 0.0
-    _pressedArea:str= None
+    _highlightedArea:str= 'x'
     _pressedX:int= None
     _pressedY:int= None
     _pressedOldX:int= None
@@ -128,7 +128,8 @@ class Gui(object ):
     rotaryObj=[{'obj':None ,'axe':'x','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 },
                {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 }]
 
-    _ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
+    #_ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
+    _ui_modes=['main','drive','feedJog','feedRun','confirm'] #confirm must be last
     _ui_mode=0
     _ui_confirm='unkn'
     _ui_mode_prev=0
@@ -161,7 +162,7 @@ class Gui(object ):
 
     @property
     def state(self):
-        return self.grblParams['_state']  
+        return self.grblParams._state
 
 
     def hello(self):
@@ -184,20 +185,20 @@ class Gui(object ):
     def neoInit(self):
         self._msg_conf = [
             ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
-            ('mx', '     '       , X_ARROW_COLOR   ,  150+67,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
-            ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-30, (115-35)//2+35+10,  1, 50    ,1, ALIGN_RIGHT),
             ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
-            ('my', '     '        , Y_ARROW_COLOR   ,  150+67, 115+40,  2, 126    ,1, ALIGN_RIGHT),
             ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
-            ('mz', '     '        , Z_ARROW_COLOR   ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('dZ', 'dZ'        , Z_ARROW_COLOR   ,  150-30, 195+40 ,  1, 50    ,1, ALIGN_RIGHT),
+            ('mx', '     '       , X_ARROW_COLOR   ,  150+67,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
+            ('my', '     '       , Y_ARROW_COLOR   ,  150+67, 115+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('mz', '     '       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
+            ('dZ', 'dZ'          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
             ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
-            ('feed', '1000 Abs WCO'    , 'white'         ,  0,  0,  2, 185,1, ALIGN_LEFT),
+            ('feed', '1000 Abs WCO'    , 'white'   ,  0,  0,  2, 185,1, ALIGN_LEFT),
             ('state', '     '    , 'white'         ,  190,  0,  2, 310-190,1, ALIGN_LEFT),
-            ('term', 'F1 - Help' , 'white',             0,  40,  2, 140          ,5, ALIGN_LEFT),
-            ('<', '<<'          ,  'yellow'        ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
-            ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 10+3*14,  405, 2, 250-10-3*14    ,1, ALIGN_CENTER),
-            ('>', '>>'          ,  'lblue'         ,  250, 400,  3, 60     ,1, ALIGN_LEFT),
+            ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
+            ('<', '<< '           ,  'yellow'       ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
+            ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 20+3*14,  405, 2, 250-20-3*14    ,1, ALIGN_CENTER),
+            ('>', ' >>'           ,  'lblue'        ,  250, 400,  3, 60     ,1, ALIGN_LEFT),
             ('info', 'info'      , 'white'         ,    0, 280,  2, 306    ,4, ALIGN_LEFT)  #6*51
         ]        
 
@@ -266,7 +267,7 @@ class Gui(object ):
               self.labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('dXY','dZ'):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              textline = '{:5.2f}'.format(self._dXY if name in ('dXY') else self._dZ)
+              textline = '{:4.0f}'.format(self._dXY if name in ('dXY') else self._dZ)
               ll.value(textline, fgcolor=VFD_WHITE)
               self.labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))              
             elif name in ('feed'):
@@ -293,7 +294,7 @@ class Gui(object ):
               else:    
                 ll.value(name,fgcolor=fgcolor, align=align)
               self.labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
-       
+        self.neoHighLight(id=self._highlightedArea)
         self.neo_refresh= True
 
 
@@ -319,7 +320,7 @@ class Gui(object ):
           if color is None:
              self.labels[id].fgcolor=VFD_YELLOW
         elif id=='state':
-          self.labels[id].text = text+(' MPG' if self.grblParams['_mpg'] else '')
+          self.labels[id].text = text+(' MPG' if self.grblParams._mpg else '')
           if color is None and text.lower().startswith('alarm'):
              self.labels[id].fgcolor=VFD_RED
           elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
@@ -329,7 +330,7 @@ class Gui(object ):
           else:   
              self.labels[id].fgcolor=color
         elif id=='feed':
-          self.labels[id].text = text+(' MPG' if self.grblParams['_mpg'] else '')
+          self.labels[id].text = text+' '+self.grblParams._wcs
           if color is None and text.lower().startswith('alarm'):
              self.labels[id].fgcolor=VFD_RED
           elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
@@ -355,11 +356,10 @@ class Gui(object ):
         elif id=='info':
           self.labels[id].text = text
           if color is None:
-             self.labels[id].fgcolor=VFD_LBLUE if self.grblParams['_mpg']  else VFD_WHITE
+             self.labels[id].fgcolor=VFD_LBLUE if self.grblParams._mpg  else VFD_WHITE
           else:   
              self.labels[id].fgcolor=color
         elif id in ('dXY','dZ'):
-          #self.labels[id].text = '{:5.2f}'.format(self._dXY if id in ('dXY') else self._dZ)
           self.labels[id].text = text
           if color is not None:
              self.labels[id].fgcolor=color
@@ -374,32 +374,32 @@ class Gui(object ):
 
     # ui terminal line position decrease
     def decTermLinePos(self):
-       if len(self.grblParams['_grbl_info'])>0 and self.term_line_from>3:
+       if len(self.grblParams._grbl_info)>0 and self.term_line_from>3:
           self.term_line_from -= 3
 
     # ui terminal position decrease
     def decTermPos(self):
-       if len(self.grblParams['_grbl_info'])>0 and self.term_pos_from>4:
+       if len(self.grblParams._grbl_info)>0 and self.term_pos_from>4:
           self.term_pos_from -= 5
 
 
     # ui terminal line position increase
     def incTermLinePos(self):
-        if len(self.grblParams['_grbl_info'])>0:
-          lines = self.grblParams['_grbl_info'].count('\n')  
+        if len(self.grblParams._grbl_info)>0:
+          lines = self.grblParams._grbl_info.count('\n')  
           lines += 1
           if self.term_line_from<lines:
              self.term_line_from += 3
 
     # ui terminal position increase
     def incTermPos(self):
-        if len(self.grblParams['_grbl_info'])>0:
+        if len(self.grblParams._grbl_info)>0:
           if self.term_pos_from<50:
              self.term_pos_from += 5
 
     # ui terminal position home
     def homeTermPos(self):
-        if len(self.grblParams['_grbl_info'])>0:
+        if len(self.grblParams._grbl_info)>0:
            self.term_pos_from = 0
            self.term_line_from = 1
 
@@ -507,6 +507,10 @@ class Gui(object ):
             if DEBUG:
                 print('neoDraw['+id+']',self.labels[id].x,self.labels[id].y,self.labels[id].fgcolor,self.labels[id].text)
             if isinstance(self.labels[id].label,Textbox )  :
+              if self.labels[id].invert:
+                self.labels[id].label.bdcolor=VFD_LBLUE
+              else:
+                self.labels[id].label.bdcolor=False  
               self.labels[id].label.clear()
               self.labels[id].label.fgcolor=self.labels[id].fgcolor
               # self.labels[id].label.append(self.labels[id].text)
@@ -542,37 +546,37 @@ class Gui(object ):
 
     @property
     def mpg(self):
-        return self.grblParams['_mpg']    
+        return self.grblParams._mpg
     
     @property
     def mpg_prev(self):
-        return self.grblParams['_mpg_prev']
+        return self.grblParams._mpg_prev
     
     @property
     def state(self):
-        return self.grblParams['_state']  
+        return self.grblParams._state
     
     @property
     def state_prev(self):
-        return self.grblParams['_state_prev']  
+        return self.grblParams._state_prev
     
     
 
     def neoWorkCoordinate(self, id:str):
-        self.neoLabel('{0:.2f}'.format(self.grblParams['_m'+id.upper()]-self.grblParams['_w'+id.upper()]),id=id)
+        self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper()) - getattr(self.grblParams, '_w' + id.upper())), id=id)
 
     def neoMachineCoordinate(self, id:str):
-        self.neoLabel('{0:.2f}'.format(self.grblParams['_m'+id.upper()]),id='m'+id)
+        self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper())), id='m' + id)
 
 
     def displayState(self):     
 
       #self.parseState(grblState)
       # print("MPG ->",grblState,' \n - >> prev ',self.state_prev, self.mpg_prev,' now=>',self.state, self.mpg)
-      self.neoLabel(self.grblParams['_grbl_display_state'],id='info')
+      self.neoLabel(self.grblParams._grbl_display_state,id='info')
       
-      if len(self.grblParams['_grbl_info'])>0:
-         self.neoTerm(self.grblParams['_grbl_info'])
+      if len(self.grblParams._grbl_info)>0:
+         self.neoTerm(self.grblParams._grbl_info)
 
       self.neoWorkCoordinate(id='x')
       self.neoWorkCoordinate(id='y')
@@ -588,7 +592,7 @@ class Gui(object ):
       
       
       if self.mpg is not None and (self.mpg_prev is None or self.mpg !=self.mpg_prev):
-          self.grblParams['_mpg_prev']=self.grblParams['_mpg']
+          self.grblParams._mpg_prev=self.grblParams._mpg
       if self.grblParserObj.state_is_changed() or self.state == 'idle' or self.state.startswith('hold') :  
               if self.state.startswith('alarm'):
                   self._jog_arrow = ''
@@ -624,66 +628,89 @@ class Gui(object ):
                   self.neoLabel(self.state,id='state')
 
 
+    def neoHighLight(self,id):
+        if id in self.labels:
+              if not self.labels[id].invert:
+                  self.labels[id].invert = True
+                  self.labels[id].label.show()
+                  if id in ('x','y','z','dXY','dZ') and self.rotaryObj[0]['axe']!=id:
+                    self.rotaryObj[0]['axe'] = id
+                    if id in ('x','y','z'):
+                      self.neoWorkCoordinate(id=id)
+                    self.initRotaryStart()
 
+                  self.neoDraw(id)
+              for label in self.labels:
+                  if label!=id:
+                    if  self.labels[label].invert :
+                        self.labels[label].invert = False
+                        if id in ('x','y','z'):
+                            self.neoWorkCoordinate(id=id)
+                        self.neoDraw(label)
+              self.neo_refresh =True          
 
     def touchscreen_press(self,x, y):
         # print('touchscreen_press:',x,y)  
-        self._pressedArea=''
+        self._highlightedArea=''
         self._pressedOldX = self._pressedX
         self._pressedOldY = self._pressedY  
         self._pressedX = x
         self._pressedY = y
-        self.neoPressedDrawPoint()
+        
         
 
         for label in self.labels:
-            if label in ('x','y','z','<','>'):
+            if label in ('x','y','z','<','>','term','dXY','dZ'):
                ll=self.labels[label]
                if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-2 and y<=ll.y+ll.height+2:
-                   self._pressedArea=label
+                   self._highlightedArea=label
                    break
-        if self._pressedArea!='':       
-          print('  pressed ',self._pressedArea)
-          if self._pressedArea in ('<','>'):
-             self.nextUiMode(-1 if self._pressedArea in ('<') else 1)
-          elif self._pressedArea in ('x','y','z'):
-            if self.enable_invert_on_select:    
-                if not self.labels[self._pressedArea].invert:
-                  self.labels[self._pressedArea].invert=True
-                  self.labels[self._pressedArea].label.show()
-                  if self.rotaryObj[0]['axe']!=self._pressedArea:
-                      self.rotaryObj[0]['axe'] = self._pressedArea
-                      self.neoWorkCoordinate(id=self._pressedArea)
-                      self.initRotaryStart()
-                  if self._pressedArea!='x' and self.labels['x'].invert:
-                      self.labels['x'].invert=False
-                      self.labels['x'].label.show()
-                      self.neoWorkCoordinate(id='x')
-                  if self._pressedArea!='y' and self.labels['y'].invert:
-                      self.labels['y'].invert=False
-                      self.labels['y'].label.show()
-                      self.neoWorkCoordinate(id='y')
-                  if self._pressedArea!='z' and self.labels['z'].invert:
-                      self.labels['z'].invert=False
-                      self.labels['z'].label.show()
-                      self.neoWorkCoordinate(id='z')
-            else:       
-                if self.labels[self._pressedArea].fgcolor!=VFD_YELLOW:
-                  self.labels[self._pressedArea].fgcolor=VFD_YELLOW
-                  if self.rotaryObj[0]['axe']!=self._pressedArea:
-                      self.rotaryObj[0]['axe'] = self._pressedArea
-                      self.neoWorkCoordinate(id=self._pressedArea)
-                      self.initRotaryStart()
-                  if self._pressedArea!='x' and self.labels['x'].fgcolor!=VFD_LBLUE:
-                      self.labels['x'].fgcolor=VFD_LBLUE
-                      self.neoWorkCoordinate(id='x')
-                  if self._pressedArea!='y' and self.labels['y'].fgcolor!=VFD_LBLUE:
-                      self.labels['y'].fgcolor=VFD_LBLUE
-                      self.neoWorkCoordinate(id='y')
-                  if self._pressedArea!='z' and self.labels['z'].fgcolor!=VFD_LBLUE:
-                      self.labels['z'].fgcolor=VFD_LBLUE
-                      self.neoWorkCoordinate(id='z')
-            self.neo_refresh =True
+        if self._highlightedArea=='':
+          self.neoPressedDrawPoint()
+        else:         
+          print('  pressed ',self._highlightedArea)
+          self.neoHighLight(id=self._highlightedArea)
+          if self._highlightedArea in ('<','>'):
+             self.nextUiMode(-1 if self._highlightedArea in ('<') else 1)
+
+            #elif self._pressedArea in ('x','y','z'):
+            # if self.enable_invert_on_select:    
+            #     if not self.labels[self._pressedArea].invert:
+            #       self.labels[self._pressedArea].invert=True
+            #       self.labels[self._pressedArea].label.show()
+            #       if self.rotaryObj[0]['axe']!=self._pressedArea:
+            #           self.rotaryObj[0]['axe'] = self._pressedArea
+            #           self.neoWorkCoordinate(id=self._pressedArea)
+            #           self.initRotaryStart()
+            #       if self._pressedArea!='x' and self.labels['x'].invert:
+            #           self.labels['x'].invert=False
+            #           self.labels['x'].label.show()
+            #           self.neoWorkCoordinate(id='x')
+            #       if self._pressedArea!='y' and self.labels['y'].invert:
+            #           self.labels['y'].invert=False
+            #           self.labels['y'].label.show()
+            #           self.neoWorkCoordinate(id='y')
+            #       if self._pressedArea!='z' and self.labels['z'].invert:
+            #           self.labels['z'].invert=False
+            #           self.labels['z'].label.show()
+            #           self.neoWorkCoordinate(id='z')
+            # else:       
+            #     if self.labels[self._pressedArea].fgcolor!=VFD_YELLOW:
+            #       self.labels[self._pressedArea].fgcolor=VFD_YELLOW
+            #       if self.rotaryObj[0]['axe']!=self._pressedArea:
+            #           self.rotaryObj[0]['axe'] = self._pressedArea
+            #           self.neoWorkCoordinate(id=self._pressedArea)
+            #           self.initRotaryStart()
+            #       if self._pressedArea!='x' and self.labels['x'].fgcolor!=VFD_LBLUE:
+            #           self.labels['x'].fgcolor=VFD_LBLUE
+            #           self.neoWorkCoordinate(id='x')
+            #       if self._pressedArea!='y' and self.labels['y'].fgcolor!=VFD_LBLUE:
+            #           self.labels['y'].fgcolor=VFD_LBLUE
+            #           self.neoWorkCoordinate(id='y')
+            #       if self._pressedArea!='z' and self.labels['z'].fgcolor!=VFD_LBLUE:
+            #           self.labels['z'].fgcolor=VFD_LBLUE
+            #           self.neoWorkCoordinate(id='z')
+            
 
     def nextUiMode(self, direction):
         self._ui_mode+=direction
@@ -727,7 +754,10 @@ class Gui(object ):
 
             updated=False
             if self._ui_modes[self._ui_mode] in ('main','drive'):
-                rotObj['mpos'] = (self.grblParams['_mX'] if rotObj['axe']=='x' else ( self.grblParams['_mY'] if rotObj['axe']=='y' else self.grblParams['_mZ'] ))
+                if rotObj['axe'] in ('x','y','z'):
+                  rotObj['mpos'] = (self.grblParams._mX if rotObj['axe']=='x' else ( self.grblParams._mY if rotObj['axe']=='y' else self.grblParams._mZ ))
+                elif rotObj['axe'] in ('dXY','dZ'):  
+                  rotObj['mpos'] = (self._dXY if rotObj['axe']=='dXY' else self._dZ )
                 updated=True
             elif self._ui_modes[self._ui_mode] in ('feedJog'):
                 rotObj['mpos'] = self._feedrateJog
@@ -735,12 +765,6 @@ class Gui(object ):
             elif self._ui_modes[self._ui_mode] in ('feedRun'):
                 rotObj['mpos'] = self._feedrateJog
                 updated=True
-            elif self._ui_modes[self._ui_mode] in ('scaleXY'):
-                rotObj['mpos'] = self._dXY
-                updated=True                      
-            elif self._ui_modes[self._ui_mode] in ('scaleZ'):
-                rotObj['mpos'] = self._dZ
-                updated=True                      
             if not updated:
                continue    
                
@@ -756,7 +780,7 @@ class Gui(object ):
                               'state':self.state,
                               'value':rotaryObj.value(),
                               'value_prev':rotaryObj.value(),
-                              'mpos':self.grblParams['_mX'] if axe=='x' else ( self.grblParams['_mY'] if axe=='y' else self.grblParams['_mZ'] ),
+                              'mpos':self.grblParams._mX if axe=='x' else ( self.grblParams._mY if axe=='y' else self.grblParams._mZ ),
                               'nanosec':time.time_ns(), 
                               'nanosec_prev':time.time_ns(), 
                               'rotary_on_mpos':None,
@@ -795,7 +819,32 @@ class Gui(object ):
             self.grblJog(y=step, feedrate=self._feedrateJog)
         elif self.rotaryObj[rotN]['axe']=='z':
             step = delta_val * self._dZ
-            self.grblJog(z=step, feedrate=self._feedrateJog)       
+            self.grblJog(z=step, feedrate=self._feedrateJog)  
+        elif self.rotaryObj[rotN]['axe'] in( 'dXY', 'dZ'):
+            try:
+              index = DXYZ_STEPS.index(self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ)
+            except ValueError:
+              print(f"The value {self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ} is not in the array.")
+              index = 0
+            print(' index1',index)  
+            index+=(1 if delta_val>0 else -1)
+            print(' index2',index)  
+            if index>=len(DXYZ_STEPS):
+              index=len(DXYZ_STEPS)-1
+            elif index<0:
+              index=0
+            print(' index3',index,DXYZ_STEPS[index])  
+            if self.rotaryObj[rotN]['axe']=='dXY':
+              self._dXY=DXYZ_STEPS[index]
+              self.showdXY() 
+            else:
+              self._dZ=DXYZ_STEPS[index]
+              self.showdZ() 
+            self.initRotaryStart()
+
+
+
+
 
 
     def upd_rotary_on_drive(self,rotN:int):
@@ -910,12 +959,18 @@ class Gui(object ):
           text='{:4.0f}'.format(self._feedrateRun)
         self.neoLabel(text,id='feed')
 
-    def showdXY(self) :     
-        self.neoLabel('{:5.2f}'.format(self._dXY),id='dXY')
+    def showdXY(self) : 
+        if self._dXY<1.0:    
+          self.neoLabel('{:4.2f}'.format(self._dXY),id='dXY')
+        else:
+           self.neoLabel('{:4.0f}'.format(self._dXY),id='dXY')
+             
          
     def showdZ(self) :     
-        print(' _dZ',self._dZ)
-        self.neoLabel('{:5.2f}'.format(self._dZ),id='dZ')
+        if self._dZ<1.0: 
+          self.neoLabel('{:4.2f}'.format(self._dZ),id='dZ')
+        else:
+          self.neoLabel('{:4.0f}'.format(self._dZ),id='dZ')
 
  
 
@@ -937,15 +992,15 @@ class Gui(object ):
           self.incTermPos()
       elif command=='termHome' : 
           self.homeTermPos()
-      if len(self.grblParams['_grbl_info'])>0:
-        self.neoLabel(self.grblParams['_grbl_info'],id='term',color=VFD_WHITE )        
+      if len(self.grblParams._grbl_info)>0:
+        self.neoLabel(self.grblParams._grbl_info,id='term',color=VFD_WHITE )        
        
     def inc_feedrateJog(self):
       if self._feedrateJog+100.0 > C_FEED_JOG_MAX:
            self._feedrateJog = C_FEED_JOG_MAX
       else:    
            self._feedrateJog +=100.0
-      self.grblParams['_state_prev']='feed'
+      self.grblParams._state_prev='feed'
       #print('g_feedrate now',self._feedrate)  
 
 
@@ -954,7 +1009,7 @@ class Gui(object ):
            self._feedrateJog = C_FEED_JOG_MIN
       else:    
            self._feedrateJog -=100.0
-      self.grblParams['_state_prev']='feed'     
+      self.grblParams._state_prev='feed'     
       #print('g_feedrate now',self._feedrate)  
 
 
@@ -963,7 +1018,7 @@ class Gui(object ):
            self._feedrateRun = C_FEED_JOG_MAX
       else:    
            self._feedrateRun +=100.0
-      self.grblParams['_state_prev']='feed'
+      self.grblParams._state_prev='feed'
       #print('g_feedrate now',self._feedrate)  
 
 
@@ -972,7 +1027,7 @@ class Gui(object ):
            self._feedrateRun = C_FEED_JOG_MIN
       else:    
            self._feedrateRun -=100.0
-      self.grblParams['_state_prev']='feed'     
+      self.grblParams._state_prev='feed'     
       #print('g_feedrate now',self._feedrate)        
 
     def inc_stepXY(self):
@@ -980,7 +1035,7 @@ class Gui(object ):
            self._dXY =C_STEP_MAX
       else:   
            self._dXY *=10.0
-      self.grblParams['_state_prev']='stepX'     
+      self.grblParams._state_prev='stepX'     
       #print('g_step+ now',self._dXY)         
 
     def dec_stepXY(self):
@@ -988,7 +1043,7 @@ class Gui(object ):
            self._dXY =C_STEP_MIN
       else:   
            self._dXY *=0.1
-      self.grblParams['_state_prev']='stepX'          
+      self.grblParams._state_prev='stepX'          
       #print('g_step- now',self._dXY)     
 
     @staticmethod
@@ -1015,17 +1070,17 @@ class Gui(object ):
 
     def stepXY(self):
       self._dXY=self.nextStepVals(self._dXY,DXYZ_STEPS)
-      self.grblParams['_state_prev']='stepX'          
+      self.grblParams._state_prev='stepX'          
       #print('g_step _dXY now',self._dXY)     
 
     def stepZ(self):
       self._dZ=self.nextStepVals(self._dZ,DXYZ_STEPS)
-      self.grblParams['_state_prev']='stepZ'          
+      self.grblParams._state_prev='stepZ'          
       #print('g_step _dZ now',self._dZ)     
 
     def set_feedrate(self):
       self._feedrateJog=self.nextStepVals(self._feedrateJog, FEED_JOG_STEPS)
-      self.grblParams['_state_prev']='feed'          
+      self.grblParams._state_prev='feed'          
       #print('g_feedrate now',self._feedrate) 
 
 
@@ -1034,7 +1089,7 @@ class Gui(object ):
            self._dZ =C_STEP_Z_MAX
       else:   
            self._dZ *=10.0
-      self.grblParams['_state_prev']='stepZ'          
+      self.grblParams._state_prev='stepZ'          
       #print('g_step_z now',self._dZ)         
 
     def dec_stepZ(self):
@@ -1042,7 +1097,7 @@ class Gui(object ):
            self._dZ =C_STEP_Z_MIN
       else:   
            self._dZ *=0.1
-      self.grblParams['_state_prev']='stepZ'          
+      self.grblParams._state_prev='stepZ'          
       #print('g_step_z now',self._dZ)  
 
     def set_jog_arrow(self, arrow:str, val):
@@ -1078,10 +1133,7 @@ class Gui(object ):
                       self.upd_rotary_on_feedJog(rotN)
                     if self._ui_modes[self._ui_mode] == 'feedRun':
                       self.upd_rotary_on_feedRun(rotN)
-                    if self._ui_modes[self._ui_mode] == 'scaleXY':
-                      self.upd_rotary_on_scaleXY(rotN)
-                    if self._ui_modes[self._ui_mode] == 'scaleZ':
-                      self.upd_rotary_on_scaleZ(rotN)       
+                     
 
 
 
