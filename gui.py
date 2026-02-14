@@ -129,7 +129,7 @@ class Gui(object ):
                {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 }]
 
     #_ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
-    _ui_modes=['main','drive','feedJog','feedRun','confirm'] #confirm must be last
+    _ui_modes=['main','drive','confirm'] #confirm must be last
     _ui_mode=0
     _ui_confirm='unkn'
     _ui_mode_prev=0
@@ -193,8 +193,8 @@ class Gui(object ):
             ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
             ('dZ', 'dZ'          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
             ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
-            ('feed', '1000 Abs WCO'    , 'white'   ,  0,  0,  2, 185,1, ALIGN_LEFT),
-            ('state', '     '    , 'white'         ,  190,  0,  2, 310-190,1, ALIGN_LEFT),
+            ('feed', '1000'    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
+            ('state', 'Idle MPG G59'    , 'white'         ,  6*20,  0,  2, 310-120,1, ALIGN_LEFT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
             ('<', '<< '           ,  'yellow'       ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
             ('icon', self._ui_modes[self._ui_mode] , ICON_COLOR, 20+3*14,  405, 2, 250-20-3*14    ,1, ALIGN_CENTER),
@@ -272,7 +272,7 @@ class Gui(object ):
               self.labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))              
             elif name in ('feed'):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              textline='{:4.0f}'.format(self._feedrateJog)+' Abs Mpos'
+              textline='{:4.0f}'.format(self._feedrateJog)
               ll.value(textline,fgcolor=fgcolor, align=align)
               self.labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('cmd','icon'):
@@ -320,7 +320,7 @@ class Gui(object ):
           if color is None:
              self.labels[id].fgcolor=VFD_YELLOW
         elif id=='state':
-          self.labels[id].text = text+(' MPG' if self.grblParams._mpg else '')
+          self.labels[id].text = text+(' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
           if color is None and text.lower().startswith('alarm'):
              self.labels[id].fgcolor=VFD_RED
           elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
@@ -330,7 +330,7 @@ class Gui(object ):
           else:   
              self.labels[id].fgcolor=color
         elif id=='feed':
-          self.labels[id].text = text+' '+self.grblParams._wcs
+          self.labels[id].text = text
           if color is None and text.lower().startswith('alarm'):
              self.labels[id].fgcolor=VFD_RED
           elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
@@ -633,7 +633,7 @@ class Gui(object ):
               if not self.labels[id].invert:
                   self.labels[id].invert = True
                   self.labels[id].label.show()
-                  if id in ('x','y','z','dXY','dZ') and self.rotaryObj[0]['axe']!=id:
+                  if id in ('x','y','z','dXY','dZ','feed') and self.rotaryObj[0]['axe']!=id:
                     self.rotaryObj[0]['axe'] = id
                     if id in ('x','y','z'):
                       self.neoWorkCoordinate(id=id)
@@ -660,7 +660,7 @@ class Gui(object ):
         
 
         for label in self.labels:
-            if label in ('x','y','z','<','>','term','dXY','dZ'):
+            if label in ('x','y','z','<','>','term','dXY','dZ','feed'):
                ll=self.labels[label]
                if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-2 and y<=ll.y+ll.height+2:
                    self._highlightedArea=label
@@ -758,12 +758,14 @@ class Gui(object ):
                   rotObj['mpos'] = (self.grblParams._mX if rotObj['axe']=='x' else ( self.grblParams._mY if rotObj['axe']=='y' else self.grblParams._mZ ))
                 elif rotObj['axe'] in ('dXY','dZ'):  
                   rotObj['mpos'] = (self._dXY if rotObj['axe']=='dXY' else self._dZ )
+                elif rotObj['axe'] in ('feed'):  
+                  rotObj['mpos'] = (self._feedrateJog if self._ui_modes[self._ui_mode] in ('main') else self._feedrateRun )
                 updated=True
             elif self._ui_modes[self._ui_mode] in ('feedJog'):
                 rotObj['mpos'] = self._feedrateJog
                 updated=True
             elif self._ui_modes[self._ui_mode] in ('feedRun'):
-                rotObj['mpos'] = self._feedrateJog
+                rotObj['mpos'] = self._feedrateRun
                 updated=True
             if not updated:
                continue    
@@ -841,6 +843,22 @@ class Gui(object ):
               self._dZ=DXYZ_STEPS[index]
               self.showdZ() 
             self.initRotaryStart()
+        elif self.rotaryObj[rotN]['axe'] in( 'feed' ): 
+          if self._ui_modes[self._ui_mode] in ('main'):    
+            self._feedrateJog+=delta_val*FEED_JOG_STEPS[0]
+            if self._feedrateJog<C_FEED_JOG_MIN:
+                self._feedrateJog=C_FEED_JOG_MIN
+            elif self._feedrateJog>C_FEED_JOG_MAX:
+                self._feedrateJog=C_FEED_JOG_MAX  
+          else:
+            self._feedrateRun+=delta_val*FEED_RUN_STEPS[0]
+            if self._feedrateRun<C_FEED_RUN_MIN:
+                self._feedrateRun=C_FEED_RUN_MIN
+            elif self._feedrateRun>C_FEED_RUN_MAX:
+                self._feedrateRun=C_FEED_RUN_MAX  
+                   
+          self.initRotaryStart()
+          self.showFeed()
 
 
 

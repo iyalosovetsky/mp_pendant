@@ -23,7 +23,7 @@ class Label(DObject):
         super().__init__(writer, row, col, height, width, fgcolor, bgcolor, bdcolor)
         self.align = align
         if text is not None:
-            self.value(text, invert)
+            self.value(text, invert)git git
 
     def value(self, text=None, invert=False, fgcolor=None, bgcolor=None, bdcolor=None, align=None):
         txt = super().value(text)
