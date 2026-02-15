@@ -1,5 +1,6 @@
 import time
 
+
 from nanoguilib.writer import CWriter
 from nanoguilib.meter import Meter
 from nanoguilib.label import Label, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER 
@@ -125,8 +126,8 @@ class Gui(object ):
     _pressedY:int= None
     _pressedOldX:int= None
     _pressedOldY:int= None
-    rotaryObj=[{'obj':None ,'axe':'x','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 },
-               {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0 }]
+    rotaryObj=[{'obj':None ,'axe':'x','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0,'updated': False },
+               {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0,'updated': False }]
 
     #_ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
     _ui_modes=['main','drive','confirm'] #confirm must be last
@@ -135,6 +136,8 @@ class Gui(object ):
     _ui_mode_prev=0
     _dXY:float = DXYZ_STEPS[2]
     _dZ:float = DXYZ_STEPS[2]
+
+
     _feedrateJog:float =  FEED_JOG_STEPS[2]
     _feedrateRun:float =  FEED_JOG_STEPS[2]
 
@@ -563,11 +566,27 @@ class Gui(object ):
     
 
     def neoWorkCoordinate(self, id:str):
-        self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper()) - getattr(self.grblParams, '_w' + id.upper())), id=id)
+      self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper()) - getattr(self.grblParams, '_w' + id.upper())), id=id)
+      self.need_refresh = True
+        
 
     def neoMachineCoordinate(self, id:str):
-        self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper())), id='m' + id)
+        if self._ui_modes[self._ui_mode] in ('main'):
+          self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_m' + id.upper())), id='m' + id)
+        elif self._ui_modes[self._ui_mode] in ('drive'):  
+          self.neoLabel('{0:.2f}'.format(getattr(self.grblParams, '_d' + id.upper()+'2go')), id='m' + id)
 
+    def show_coordinates(self, id:str=None):
+        if id is None:
+            self.neoWorkCoordinate(id='x')
+            self.neoWorkCoordinate(id='y')
+            self.neoWorkCoordinate(id='z')
+            self.neoMachineCoordinate(id='x')
+            self.neoMachineCoordinate(id='y')
+            self.neoMachineCoordinate(id='z')      
+        else:
+            self.neoWorkCoordinate(id=id)
+            self.neoMachineCoordinate(id=id)    
 
     def displayState(self):     
 
@@ -578,13 +597,7 @@ class Gui(object ):
       if len(self.grblParams._grbl_info)>0:
          self.neoTerm(self.grblParams._grbl_info)
 
-      self.neoWorkCoordinate(id='x')
-      self.neoWorkCoordinate(id='y')
-      self.neoWorkCoordinate(id='z')
-
-      self.neoMachineCoordinate(id='x')
-      self.neoMachineCoordinate(id='y')
-      self.neoMachineCoordinate(id='z')
+      self.show_coordinates()
       
       
       
@@ -661,55 +674,18 @@ class Gui(object ):
 
         for label in self.labels:
             if label in ('x','y','z','<','>','term','dXY','dZ','feed'):
-               ll=self.labels[label]
-               if x>=ll.x-2 and x<=ll.x+ll.width+2 and y>=ll.y-2 and y<=ll.y+ll.height+2:
+               if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
+                 and y>=self.labels[label].y-2 and y<=self.labels[label].y+self.labels[label].height+2:
                    self._highlightedArea=label
                    break
-        if self._highlightedArea=='':
-          self.neoPressedDrawPoint()
-        else:         
+        if self._highlightedArea!='':
           print('  pressed ',self._highlightedArea)
           self.neoHighLight(id=self._highlightedArea)
           if self._highlightedArea in ('<','>'):
              self.nextUiMode(-1 if self._highlightedArea in ('<') else 1)
+        elif self.debug:
+            self.neoPressedDrawPoint()
 
-            #elif self._pressedArea in ('x','y','z'):
-            # if self.enable_invert_on_select:    
-            #     if not self.labels[self._pressedArea].invert:
-            #       self.labels[self._pressedArea].invert=True
-            #       self.labels[self._pressedArea].label.show()
-            #       if self.rotaryObj[0]['axe']!=self._pressedArea:
-            #           self.rotaryObj[0]['axe'] = self._pressedArea
-            #           self.neoWorkCoordinate(id=self._pressedArea)
-            #           self.initRotaryStart()
-            #       if self._pressedArea!='x' and self.labels['x'].invert:
-            #           self.labels['x'].invert=False
-            #           self.labels['x'].label.show()
-            #           self.neoWorkCoordinate(id='x')
-            #       if self._pressedArea!='y' and self.labels['y'].invert:
-            #           self.labels['y'].invert=False
-            #           self.labels['y'].label.show()
-            #           self.neoWorkCoordinate(id='y')
-            #       if self._pressedArea!='z' and self.labels['z'].invert:
-            #           self.labels['z'].invert=False
-            #           self.labels['z'].label.show()
-            #           self.neoWorkCoordinate(id='z')
-            # else:       
-            #     if self.labels[self._pressedArea].fgcolor!=VFD_YELLOW:
-            #       self.labels[self._pressedArea].fgcolor=VFD_YELLOW
-            #       if self.rotaryObj[0]['axe']!=self._pressedArea:
-            #           self.rotaryObj[0]['axe'] = self._pressedArea
-            #           self.neoWorkCoordinate(id=self._pressedArea)
-            #           self.initRotaryStart()
-            #       if self._pressedArea!='x' and self.labels['x'].fgcolor!=VFD_LBLUE:
-            #           self.labels['x'].fgcolor=VFD_LBLUE
-            #           self.neoWorkCoordinate(id='x')
-            #       if self._pressedArea!='y' and self.labels['y'].fgcolor!=VFD_LBLUE:
-            #           self.labels['y'].fgcolor=VFD_LBLUE
-            #           self.neoWorkCoordinate(id='y')
-            #       if self._pressedArea!='z' and self.labels['z'].fgcolor!=VFD_LBLUE:
-            #           self.labels['z'].fgcolor=VFD_LBLUE
-            #           self.neoWorkCoordinate(id='z')
             
 
     def nextUiMode(self, direction):
@@ -723,14 +699,21 @@ class Gui(object ):
           self._ui_mode=0
 
         self._ui_confirm='unkn'
+        self.rotaryObj[0]['axe']='x'
         self.neoIcon(text=self._ui_modes[self._ui_mode])
+        self.grblParams._dX2go=0.0
+        self.grblParams._dY2go=0.0
+        self.grblParams._dZ2go=0.0
         self.initRotaryStart()
         self.showFeed()
-        self.labels['dXY'].fgcolor=VFD_WHITE
-        self.labels['dZ'].fgcolor=VFD_WHITE
+        # self.labels['dXY'].fgcolor=VFD_WHITE
+        # self.labels['dZ'].fgcolor=VFD_WHITE
 
-        self.showdXY()
-        self.showdZ()
+        self.show_dXY()
+        self.show_dZ()
+        self.show_coordinates()
+        self.neoHighLight(id='x') # default highlight x coordinate in main and drive modes
+
 
     def enterConfirmMode(self):
        self.nextUiMode(0)
@@ -761,16 +744,19 @@ class Gui(object ):
                 elif rotObj['axe'] in ('feed'):  
                   rotObj['mpos'] = (self._feedrateJog if self._ui_modes[self._ui_mode] in ('main') else self._feedrateRun )
                 updated=True
-            elif self._ui_modes[self._ui_mode] in ('feedJog'):
-                rotObj['mpos'] = self._feedrateJog
-                updated=True
-            elif self._ui_modes[self._ui_mode] in ('feedRun'):
-                rotObj['mpos'] = self._feedrateRun
-                updated=True
+            # elif self._ui_modes[self._ui_mode] in ('feedJog'):
+            #     rotObj['mpos'] = self._feedrateJog
+            #     updated=True
+            # elif self._ui_modes[self._ui_mode] in ('feedRun'):
+            #     rotObj['mpos'] = self._feedrateRun
+            #     updated=True
             if not updated:
                continue    
-               
-            rotObj['rotary_on_mpos'] = rotObj['obj'].value()
+            if self._ui_modes[self._ui_mode] in ('main'):
+              rotObj['rotary_on_mpos'] = rotObj['obj'].value()
+            else:
+              rotObj['rotary_on_mpos'] = rotObj['obj'].value() - \
+                (self.grblParams._dX2go if rotObj['axe']=='x' else ( self.grblParams._dY2go if rotObj['axe']=='y' else self.grblParams._dZ2go ))
             rotObj['value_prev'] = rotObj['obj'].value()
             rotObj['value'] = rotObj['obj'].value()
             rotObj['nanosec'] = time.time_ns()
@@ -786,7 +772,8 @@ class Gui(object ):
                               'nanosec':time.time_ns(), 
                               'nanosec_prev':time.time_ns(), 
                               'rotary_on_mpos':None,
-                              'scale':1.0
+                              'scale':1.0,
+                              'updated':False
                                 }
 
 
@@ -797,11 +784,44 @@ class Gui(object ):
             self.rotaryObj[rotN]['value']=self.rotaryObj[rotN]['obj'].value()
             self.rotaryObj[rotN]['nanosec_prev']=self.rotaryObj[rotN]['nanosec']
             self.rotaryObj[rotN]['nanosec']=time.time_ns()
-            # if self._mPosInited:
-            # if self.rotaryObj[rotN]['nanosec_prev']-self.rotaryObj[rotN]['nanosec']>1000000: #
-                    # self.rotaryObj[rotN]['rotary_on_mpos']=self.rotaryObj[rotN]['value']
-                # print ('rotary_listener: #',rotN,self.rotaryObj[rotN]['axe'],self.rotaryObj[rotN]['value'],self.rotaryObj[rotN]['mpos'])
-                # print ('              delta:', self.rotaryObj[rotN]['value']- self.rotaryObj[rotN]['rotary_on_mpos']  )
+            self.rotaryObj[rotN]['updated']=False
+
+    def upd_rotary_on_feed(self,rotN:int):        
+        if self._ui_modes[self._ui_mode] in ('main'):    
+          self._feedrateJog+=(self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos'])*FEED_JOG_STEPS[0]
+          if self._feedrateJog<C_FEED_JOG_MIN:
+              self._feedrateJog=C_FEED_JOG_MIN
+          elif self._feedrateJog>C_FEED_JOG_MAX:
+              self._feedrateJog=C_FEED_JOG_MAX  
+        else:
+          self._feedrateRun+=(self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos'])*FEED_RUN_STEPS[0]
+          if self._feedrateRun<C_FEED_RUN_MIN:
+              self._feedrateRun=C_FEED_RUN_MIN
+          elif self._feedrateRun>C_FEED_RUN_MAX:
+              self._feedrateRun=C_FEED_RUN_MAX  
+        self.initRotaryStart()
+        self.showFeed()
+        self.rotaryObj[rotN]['updated'] = True
+
+    def upd_rotary_on_scale(self,rotN:int):        
+        try:
+          index = DXYZ_STEPS.index(self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ)
+        except ValueError:
+          print(f"The value {self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ} is not in the array.")
+          index = 0
+        index+=(1 if self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']>0 else -1)
+        if index>=len(DXYZ_STEPS):
+          index=len(DXYZ_STEPS)-1
+        elif index<0:
+          index=0
+        if self.rotaryObj[rotN]['axe']=='dXY':
+          self._dXY=DXYZ_STEPS[index]
+          self.show_dXY() 
+        else:
+          self._dZ=DXYZ_STEPS[index]
+          self.show_dZ() 
+        self.initRotaryStart()
+        self.rotaryObj[rotN]['updated'] = True
 
 
     def upd_rotary_on_main(self,rotN:int):    
@@ -810,8 +830,6 @@ class Gui(object ):
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
             return
-
-        #step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
         
         if self.rotaryObj[rotN]['axe']=='x':
             step = delta_val *  self._dXY
@@ -823,42 +841,9 @@ class Gui(object ):
             step = delta_val * self._dZ
             self.grblJog(z=step, feedrate=self._feedrateJog)  
         elif self.rotaryObj[rotN]['axe'] in( 'dXY', 'dZ'):
-            try:
-              index = DXYZ_STEPS.index(self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ)
-            except ValueError:
-              print(f"The value {self._dXY if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ} is not in the array.")
-              index = 0
-            print(' index1',index)  
-            index+=(1 if delta_val>0 else -1)
-            print(' index2',index)  
-            if index>=len(DXYZ_STEPS):
-              index=len(DXYZ_STEPS)-1
-            elif index<0:
-              index=0
-            print(' index3',index,DXYZ_STEPS[index])  
-            if self.rotaryObj[rotN]['axe']=='dXY':
-              self._dXY=DXYZ_STEPS[index]
-              self.showdXY() 
-            else:
-              self._dZ=DXYZ_STEPS[index]
-              self.showdZ() 
-            self.initRotaryStart()
-        elif self.rotaryObj[rotN]['axe'] in( 'feed' ): 
-          if self._ui_modes[self._ui_mode] in ('main'):    
-            self._feedrateJog+=delta_val*FEED_JOG_STEPS[0]
-            if self._feedrateJog<C_FEED_JOG_MIN:
-                self._feedrateJog=C_FEED_JOG_MIN
-            elif self._feedrateJog>C_FEED_JOG_MAX:
-                self._feedrateJog=C_FEED_JOG_MAX  
-          else:
-            self._feedrateRun+=delta_val*FEED_RUN_STEPS[0]
-            if self._feedrateRun<C_FEED_RUN_MIN:
-                self._feedrateRun=C_FEED_RUN_MIN
-            elif self._feedrateRun>C_FEED_RUN_MAX:
-                self._feedrateRun=C_FEED_RUN_MAX  
-                   
-          self.initRotaryStart()
-          self.showFeed()
+            self.upd_rotary_on_scale(rotN)
+        elif self.rotaryObj[rotN]['axe'] in( 'feed' ):
+          self.upd_rotary_on_feed(rotN) 
 
 
 
@@ -871,100 +856,112 @@ class Gui(object ):
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
             return
-        step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
+        #step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
 
         if self.rotaryObj[rotN]['axe']=='x':
             #self.grblJog(x=step, feedrate=self._feedrateRun)
-            print('new pos ',self.rotaryObj[rotN]['axe'],step)
+            self.grblParams._dX2go=delta_val *self._dXY
+            self.show_coordinates('x')
+            self.rotaryObj[rotN]['updated'] = True
+            print('new pos x',self.grblParams._dX2go)
         elif self.rotaryObj[rotN]['axe']=='y':
-            print('new pos ',self.rotaryObj[rotN]['axe'],step)
+            self.grblParams._dY2go=delta_val *self._dXY
+            self.rotaryObj[rotN]['updated'] = True
+            self.show_coordinates('y')
+            print('new pos y' ,self.grblParams._dY2go)
         elif self.rotaryObj[rotN]['axe']=='z':
-            print('new pos ',self.rotaryObj[rotN]['axe'],step)
+            self.grblParams._dZ2go=delta_val * self._dZ
+            self.rotaryObj[rotN]['updated'] = True
+            self.show_coordinates('z')
+            print('new pos z', self.grblParams._dZ2go)
+        elif self.rotaryObj[rotN]['axe'] in( 'dXY', 'dZ'):
+            self.upd_rotary_on_scale(rotN)
+        elif self.rotaryObj[rotN]['axe'] in( 'feed' ):
+          self.upd_rotary_on_feed(rotN) 
 
 
 
-
-    def upd_rotary_on_feedJog(self,rotN:int):
-        if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
-           return            
-        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
-        if delta_val==0 :
-           return
-        self._feedrateJog+=delta_val*FEED_JOG_STEPS[0]
-        if self._feedrateJog<C_FEED_JOG_MIN:
-            self._feedrateJog=C_FEED_JOG_MIN
-        elif self._feedrateJog>C_FEED_JOG_MAX:
-            self._feedrateJog=C_FEED_JOG_MAX  
-        self.initRotaryStart()
-        self.showFeed()
+    # def upd_rotary_on_feedJog(self,rotN:int):
+    #     if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+    #        return            
+    #     delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+    #     if delta_val==0 :
+    #        return
+    #     self._feedrateJog+=delta_val*FEED_JOG_STEPS[0]
+    #     if self._feedrateJog<C_FEED_JOG_MIN:
+    #         self._feedrateJog=C_FEED_JOG_MIN
+    #     elif self._feedrateJog>C_FEED_JOG_MAX:
+    #         self._feedrateJog=C_FEED_JOG_MAX  
+    #     self.initRotaryStart()
+    #     self.showFeed()
 
      
 
 
-    def upd_rotary_on_feedRun(self,rotN:int):
-        if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
-           return            
-        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
-        if delta_val==0 :
-           return
-        self._feedrateRun+=delta_val*FEED_RUN_STEPS[0]
-        if self._feedrateJog<C_FEED_JOG_MIN:
-            self._feedrateJog=C_FEED_JOG_MIN
-        elif self._feedrateJog>C_FEED_JOG_MAX:
-            self._feedrateJog=C_FEED_JOG_MAX  
-        self.initRotaryStart()
-        self.showFeed()            
+    # def upd_rotary_on_feedRun(self,rotN:int):
+    #     if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+    #        return            
+    #     delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+    #     if delta_val==0 :
+    #        return
+    #     self._feedrateRun+=delta_val*FEED_RUN_STEPS[0]
+    #     if self._feedrateJog<C_FEED_JOG_MIN:
+    #         self._feedrateJog=C_FEED_JOG_MIN
+    #     elif self._feedrateJog>C_FEED_JOG_MAX:
+    #         self._feedrateJog=C_FEED_JOG_MAX  
+    #     self.initRotaryStart()
+    #     self.showFeed()            
 
-    def upd_rotary_on_scaleXY(self,rotN:int):    
-        if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
-           return        
-        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
-        if abs(delta_val)<2 :
-           return
+    # def upd_rotary_on_scaleXY(self,rotN:int):    
+    #     if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+    #        return        
+    #     delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+    #     if abs(delta_val)<2 :
+    #        return
         
-        try:
-          index = DXYZ_STEPS.index(self._dXY)
-        except ValueError:
-          print(f"The value {self._dXY} is not in the array.")
-          index = 0
-        print(' _dXY index1',index)  
-        index+=(1 if delta_val>0 else -1)
-        print(' _dXY index2',index)  
-        if index>=len(DXYZ_STEPS):
-           self._dXY=DXYZ_STEPS[-1]
-        elif index<0:
-           self._dXY=DXYZ_STEPS[0]
-        else:
-           self._dXY=DXYZ_STEPS[index]
+    #     try:
+    #       index = DXYZ_STEPS.index(self._dXY)
+    #     except ValueError:
+    #       print(f"The value {self._dXY} is not in the array.")
+    #       index = 0
+    #     print(' _dXY index1',index)  
+    #     index+=(1 if delta_val>0 else -1)
+    #     print(' _dXY index2',index)  
+    #     if index>=len(DXYZ_STEPS):
+    #        self._dXY=DXYZ_STEPS[-1]
+    #     elif index<0:
+    #        self._dXY=DXYZ_STEPS[0]
+    #     else:
+    #        self._dXY=DXYZ_STEPS[index]
 
-        self.initRotaryStart()
-        self.showdXY()  
+    #     self.initRotaryStart()
+    #     self.showdXY()  
         
         
 
-    def upd_rotary_on_scaleZ(self,rotN:int):
-        if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
-           return            
-        delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
-        if delta_val==0 :
-           return
+    # def upd_rotary_on_scaleZ(self,rotN:int):
+    #     if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+    #        return            
+    #     delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
+    #     if delta_val==0 :
+    #        return
         
-        try:
-          index = DXYZ_STEPS.index(self._dZ)
-        except ValueError:
-          print(f"The value {self._dZ} is not in the array.")
-          index = 0
+    #     try:
+    #       index = DXYZ_STEPS.index(self._dZ)
+    #     except ValueError:
+    #       print(f"The value {self._dZ} is not in the array.")
+    #       index = 0
 
-        index+=(1 if delta_val>0 else -1)  
-        if index>=len(DXYZ_STEPS):
-           self._dZ=DXYZ_STEPS[-1]
-        elif index<0:
-           self._dZ=DXYZ_STEPS[0]
-        else:
-           self._dZ=DXYZ_STEPS[index]
+    #     index+=(1 if delta_val>0 else -1)  
+    #     if index>=len(DXYZ_STEPS):
+    #        self._dZ=DXYZ_STEPS[-1]
+    #     elif index<0:
+    #        self._dZ=DXYZ_STEPS[0]
+    #     else:
+    #        self._dZ=DXYZ_STEPS[index]
 
-        self.initRotaryStart()
-        self.showdZ()          
+    #     self.initRotaryStart()
+    #     self.showdZ()          
         
 
 
@@ -977,14 +974,14 @@ class Gui(object ):
           text='{:4.0f}'.format(self._feedrateRun)
         self.neoLabel(text,id='feed')
 
-    def showdXY(self) : 
+    def show_dXY(self) : 
         if self._dXY<1.0:    
           self.neoLabel('{:4.2f}'.format(self._dXY),id='dXY')
         else:
            self.neoLabel('{:4.0f}'.format(self._dXY),id='dXY')
              
          
-    def showdZ(self) :     
+    def show_dZ(self) :     
         if self._dZ<1.0: 
           self.neoLabel('{:4.2f}'.format(self._dZ),id='dZ')
         else:
@@ -1130,7 +1127,12 @@ class Gui(object ):
     def upd_rotary(self):
         #print ('upd_rotary: every 1s')
         for rotN in range(len(self.rotaryObj)):
-            if self.rotaryObj[rotN]['obj'] is not None:
+            if self.rotaryObj[rotN]['obj'] is not None  :
+                if self.rotaryObj[rotN]['updated'] and \
+                  (self._ui_modes[self._ui_mode] == 'drive' or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
+                  continue
+                
+
                 #print ('upd_rotary: every 1s[2], rotN=',rotN, self._mPosInited , self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'])
                 if self.rotaryObj[rotN]['state'] not in ('jog','run','planed'):
                     #print ('upd_rotary: every 1s[3], rotN=',rotN, time.time_ns()-self.rotaryObj[rotN]['nanosec'],time.time_ns(),self.rotaryObj[rotN]['nanosec'])
@@ -1147,10 +1149,10 @@ class Gui(object ):
                       self.upd_rotary_on_main(rotN)
                     if self._ui_modes[self._ui_mode] == 'drive':
                       self.upd_rotary_on_drive(rotN)
-                    if self._ui_modes[self._ui_mode] == 'feedJog':
-                      self.upd_rotary_on_feedJog(rotN)
-                    if self._ui_modes[self._ui_mode] == 'feedRun':
-                      self.upd_rotary_on_feedRun(rotN)
+                    # if self._ui_modes[self._ui_mode] == 'feedJog':
+                    #   self.upd_rotary_on_feedJog(rotN)
+                    # if self._ui_modes[self._ui_mode] == 'feedRun':
+                    #   self.upd_rotary_on_feedRun(rotN)
                      
 
 

@@ -20,42 +20,50 @@ class GrblParams:
     ]
 
     def __init__(self):
-        self._mX = 0.0
-        self._mY = 0.0
-        self._mZ = 0.0
-        self._mA = 0.0
-        self._mB = 0.0
-        self._mC = 0.0
+        self._mX:float = 0.0
+        self._mY:float = 0.0
+        self._mZ:float = 0.0
+        self._mA:float = 0.0
+        self._mB:float = 0.0
+        self._mC:float = 0.0
 
-        self._mX_prev = 0.0
-        self._mY_prev = 0.0
-        self._mZ_prev = 0.0
-        self._mA_prev = 0.0
-        self._mB_prev = 0.0
-        self._mC_prev = 0.0
+        self._mX_prev:float = 0.0
+        self._mY_prev:float = 0.0
+        self._mZ_prev:float = 0.0
+        self._mA_prev:float = 0.0
+        self._mB_prev:float = 0.0
+        self._mC_prev:float = 0.0
 
-        self._wX = 0.0
-        self._wY = 0.0
-        self._wZ = 0.0
-        self._wA = 0.0
-        self._wB = 0.0
-        self._wC = 0.0
+        self._wX:float = 0.0
+        self._wY:float = 0.0
+        self._wZ:float = 0.0
+        self._wA:float = 0.0
+        self._wB:float = 0.0
+        self._wC:float = 0.0
 
-        self._wX_prev = 0.0
-        self._wY_prev = 0.0
-        self._wZ_prev = 0.0
-        self._wA_prev = 0.0
-        self._wB_prev = 0.0
-        self._wC_prev = 0.0
+        self._wX_prev:float = 0.0
+        self._wY_prev:float = 0.0
+        self._wZ_prev:float = 0.0
+        self._wA_prev:float = 0.0
+        self._wB_prev:float = 0.0
+        self._wC_prev:float = 0.0
+
+        self._dX2go:float = 0.0
+        self._dY2go:float = 0.0
+        self._dZ2go:float = 0.0
+        self._dA2go:float = 0.0
+        self._dB2go:float = 0.0
+        self._dC2go:float = 0.0
+  
         
-        self._mpg = None
-        self._mpg_prev = ''
-        self._wcs = ''
-        self._wcs_prev = ''
-        self._state = 'Idle'
-        self._state_prev = 'unk'
-        self._grbl_display_state = ''
-        self._grbl_info = ''
+        self._mpg:str = None
+        self._mpg_prev:str = ''
+        self._wcs:str = ''
+        self._wcs_prev:str = ''
+        self._state:str = 'Idle'
+        self._state_prev:str = 'unk'
+        self._grbl_display_state:str = ''
+        self._grbl_info:str = ''
  
 
 BLINK_2 = 1
@@ -782,11 +790,31 @@ class GrblState(object):
  
     def button_yellow_callback(self,pin,button):
         print('button_yellow_callback')
+        
         if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
           self._ui_confirm='yes'
           self.gui._ui_mode= self.gui._ui_mode_prev
         else:
-          self.gui.nextUiMode(-1) 
+          if self.gui._ui_modes[self.gui._ui_mode] == 'drive' \
+             and (self.grblParams._dX2go!=0 or self.grblParams._dY2go!=0 or self.grblParams._dZ2go!=0):
+             cmd='G91 G1'
+             if self.grblParams._dX2go!=0:
+               cmd+=' X{0:.3f}'.format(self.grblParams._dX2go)
+             if self.grblParams._dY2go!=0:
+               cmd+=' Y{0:.3f}'.format(self.grblParams._dY2go)
+             if self.grblParams._dZ2go!=0:
+               cmd+=' Z{0:.3f}'.format(self.grblParams._dZ2go)
+             if self.gui._feedrateRun>0:
+               cmd+=' F{0:.0f}'.format(self.gui._feedrateRun)
+             else:
+               cmd+=' F{0:.0f}'.format(50)  
+             
+             self.mpgCommandShow(cmd)
+             self.grblParams._dX2go=0.00
+             self.grblParams._dY2go=0.00
+             self.grblParams._dZ2go=0.00
+          else:  
+              self.gui.nextUiMode(-1) 
 
 
     def button_yellow_callback_long(self,pin ,button):
