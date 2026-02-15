@@ -12,7 +12,6 @@ import nanoguilib.courier20 as fixed
 import nanoguilib.arial35 as arial35
 
 
-
 VFD0_PURPLE = 0x00FFD2
 VFD0_GREEN = 0x30BF30
 VFD0_RED = 0xCF3030
@@ -679,14 +678,7 @@ class Gui(object ):
                  and y>=self.labels[label].y-2 and y<=self.labels[label].y+self.labels[label].height+2:
                    self._highlightedArea=label
                    break
-<<<<<<< HEAD
         if self._highlightedArea!='':
-=======
-        if self._highlightedArea=='':
-          if self.debug:
-            self.neoPressedDrawPoint()
-        else:         
->>>>>>> e1dfd0f3c06fe304a9c7256baf9ca49ca63f01dc
           print('  pressed ',self._highlightedArea)
           self.neoHighLight(id=self._highlightedArea)
           if self._highlightedArea in ('<','>'):
