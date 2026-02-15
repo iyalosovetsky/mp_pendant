@@ -1,6 +1,5 @@
 import time
 import machine
-
 from machine import UART
 from gui import Gui, VFD_YELLOW, VFD_LBLUE,VFD_WHITE
 

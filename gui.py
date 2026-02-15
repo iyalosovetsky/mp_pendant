@@ -12,6 +12,7 @@ import nanoguilib.courier20 as fixed
 import nanoguilib.arial35 as arial35
 
 
+
 VFD0_PURPLE = 0x00FFD2
 VFD0_GREEN = 0x30BF30
 VFD0_RED = 0xCF3030
