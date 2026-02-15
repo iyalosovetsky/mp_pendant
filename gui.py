@@ -666,7 +666,8 @@ class Gui(object ):
                    self._highlightedArea=label
                    break
         if self._highlightedArea=='':
-          self.neoPressedDrawPoint()
+          if self.debug:
+            self.neoPressedDrawPoint()
         else:         
           print('  pressed ',self._highlightedArea)
           self.neoHighLight(id=self._highlightedArea)
