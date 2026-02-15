@@ -740,6 +740,9 @@ class Gui(object ):
           self.neoHighLight(id='x') # default highlight x coordinate in main and drive modes
         elif self._ui_modes[self._ui_mode] in ('template'):
           self.neoIcon(text=self._ui_modes[self._ui_mode])
+          self.rotaryObj[0]['axe']='term'
+          self.initRotaryStart()
+          self.neoHighLight(id='term')
           self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
 
 
@@ -756,7 +759,7 @@ class Gui(object ):
 
 
     def initRotaryStart(self):
-        if not self._ui_modes[self._ui_mode] in ('main','drive'): # wait there for coordintes from grbl
+        if not self._ui_modes[self._ui_mode] in ('main','drive','template'): # wait there for coordintes from grbl
           return 
         
         for rotObj  in self.rotaryObj:  
@@ -764,6 +767,7 @@ class Gui(object ):
                 continue 
 
             updated=False
+            value = rotObj['obj'].value()
             if self._ui_modes[self._ui_mode] in ('main','drive'):
                 if rotObj['axe'] in ('x','y','z'):
                   rotObj['mpos'] = (self.grblParams._mX if rotObj['axe']=='x' else ( self.grblParams._mY if rotObj['axe']=='y' else self.grblParams._mZ ))
@@ -772,10 +776,20 @@ class Gui(object ):
                     rotObj['mpos'] = (self._dXY_jog if rotObj['axe']=='dXY' else self._dZ_jog )
                   else:  
                     rotObj['mpos'] = (self._dXY_run if rotObj['axe']=='dXY' else self._dZ_run )
-
                 elif rotObj['axe'] in ('feed'):  
                   rotObj['mpos'] = (self._feedrateJog if self._ui_modes[self._ui_mode] in ('main') else self._feedrateRun )
+                if self._ui_modes[self._ui_mode] in ('main'):
+                  rotObj['rotary_on_mpos'] = value
+                elif self._ui_modes[self._ui_mode] in ('drive'):
+                  #todo minus move to block what compare
+                  rotObj['rotary_on_mpos'] = value -  (self.grblParams._dX2go if rotObj['axe']=='x' else ( self.grblParams._dY2go if rotObj['axe']=='y' else self.grblParams._dZ2go ))
                 updated=True
+
+            elif self._ui_modes[self._ui_mode] in ('template'):
+                if rotObj['axe'] in ('term'):  
+                  rotObj['mpos'] = self._current_template_idx
+                  rotObj['rotary_on_mpos'] = value 
+                  updated=True
             # elif self._ui_modes[self._ui_mode] in ('feedJog'):
             #     rotObj['mpos'] = self._feedrateJog
             #     updated=True
@@ -784,13 +798,9 @@ class Gui(object ):
             #     updated=True
             if not updated:
                continue    
-            if self._ui_modes[self._ui_mode] in ('main'):
-              rotObj['rotary_on_mpos'] = rotObj['obj'].value()
-            else:
-              rotObj['rotary_on_mpos'] = rotObj['obj'].value() - \
-                (self.grblParams._dX2go if rotObj['axe']=='x' else ( self.grblParams._dY2go if rotObj['axe']=='y' else self.grblParams._dZ2go ))
-            rotObj['value_prev'] = rotObj['obj'].value()
-            rotObj['value'] = rotObj['obj'].value()
+             
+            rotObj['value_prev'] = value
+            rotObj['value'] = value
             rotObj['nanosec'] = time.time_ns()
             rotObj['nanosec_prev'] = rotObj['nanosec']
         
@@ -915,22 +925,45 @@ class Gui(object ):
             self.grblParams._dX2go=delta_val *self._dXY_run
             self.show_coordinates('x')
             self.rotaryObj[rotN]['updated'] = True
-            print('new pos x',self.grblParams._dX2go)
+            # print('new pos x',self.grblParams._dX2go)
         elif self.rotaryObj[rotN]['axe']=='y':
             self.grblParams._dY2go=delta_val *self._dXY_run
             self.rotaryObj[rotN]['updated'] = True
             self.show_coordinates('y')
-            print('new pos y' ,self.grblParams._dY2go)
+            # print('new pos y' ,self.grblParams._dY2go)
         elif self.rotaryObj[rotN]['axe']=='z':
             self.grblParams._dZ2go=delta_val * self._dZ_run
             self.rotaryObj[rotN]['updated'] = True
             self.show_coordinates('z')
-            print('new pos z', self.grblParams._dZ2go)
+            # print('new pos z', self.grblParams._dZ2go)
         elif self.rotaryObj[rotN]['axe'] in( 'dXY', 'dZ'):
             self.upd_rotary_on_scale_run(rotN)
         elif self.rotaryObj[rotN]['axe'] in( 'feed' ):
           self.upd_rotary_on_feed(rotN) 
 
+    def upd_rotary_on_template(self,rotN:int):
+        if self.rotaryObj[rotN]['obj'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+           return            
+        delta_val = self.rotaryObj[rotN]['obj'].value() - self.rotaryObj[rotN]['rotary_on_mpos']
+        if delta_val==0 :
+            return
+        #step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
+
+        if self.rotaryObj[rotN]['axe']=='term':
+            if self._current_template_idx is None:
+                return
+            #print('old pos d, val, from',delta_val,self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'])
+            index = self._current_template_idx + (1 if delta_val>0 else -1)
+            if index > len(self.templ_files)-1:
+                self._current_template_idx=len(self.templ_files)-1
+            elif index<0:
+                self._current_template_idx=0
+            else:
+                self._current_template_idx=index
+            self.initRotaryStart()  
+            self.rotaryObj[rotN]['updated'] = True
+            #print('  new pos val, from',self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'])
+            self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
 
 
     # def upd_rotary_on_feedJog(self,rotN:int):
@@ -1194,7 +1227,7 @@ class Gui(object ):
         for rotN in range(len(self.rotaryObj)):
             if self.rotaryObj[rotN]['obj'] is not None  :
                 if self.rotaryObj[rotN]['updated'] and \
-                  (self._ui_modes[self._ui_mode] == 'drive' or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
+                  (self._ui_modes[self._ui_mode] == 'drive' or self._ui_modes[self._ui_mode] == 'template' or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
                   continue
                 
 
@@ -1212,8 +1245,11 @@ class Gui(object ):
                     #print ('upd_rotary: every 1s[2], rotN=',rotN, self._mPosInited , self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'],'mode',self._ui_modes[self._ui_mode])
                     if self._ui_modes[self._ui_mode] == 'main':
                       self.upd_rotary_on_main(rotN)
-                    if self._ui_modes[self._ui_mode] == 'drive':
+                    elif self._ui_modes[self._ui_mode] == 'drive':
                       self.upd_rotary_on_drive(rotN)
+                    elif self._ui_modes[self._ui_mode] == 'template':
+                      self.upd_rotary_on_template(rotN)  
+
                     # if self._ui_modes[self._ui_mode] == 'feedJog':
                     #   self.upd_rotary_on_feedJog(rotN)
                     # if self._ui_modes[self._ui_mode] == 'feedRun':
