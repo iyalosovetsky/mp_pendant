@@ -130,9 +130,10 @@ class ILI9488(framebuf.FrameBuffer):
         self._linebuf = bytearray(self._lines_per_write * self.width * 3)
 
         # Hardware reset
-        self._rst(0)
-        sleep_ms(50)
-        self._rst(1)
+        if self._rst is not None:
+            self._rst(0)
+            sleep_ms(50)
+            self._rst(1)
         sleep_ms(50)
         if self._spi_init:  # A callback was passed
             self._spi_init(spi)  # Bus may be shared

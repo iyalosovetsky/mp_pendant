@@ -10,11 +10,16 @@ from ns2009 import Touch
 from button import Button
 
 
+
+
+
 print(machine.freq()) 
 # Set CPU to 300 MHz
 machine.freq(300000000)
 # Verify the new frequency
 print(machine.freq()) 
+
+
 
 # Initialize UART (adjust parameters for your board/pins)
 
@@ -45,7 +50,7 @@ DEBUG = False
 
 refresh(ssd, True)
 
-st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False )
+st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False, templateDir='/templates')
 st.gui.set_rotary_obj(rot0,0,'x',1.0)
 rot0.add_listener(st.rotary_listener0)
 

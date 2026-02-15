@@ -84,13 +84,17 @@ import gc
 # STM specific driver
 #SSD = ST7789
 #SSD = ILI9488
-SSD.COLOR_INVERT = 0xFFFF
+#SSD.COLOR_INVERT = 0xFFFF
+SSD.COLOR_INVERT = 0
 
 #pdc = Pin(8, Pin.OUT, value=0)
 pdc = Pin(15, Pin.OUT, value=0)
-pcs = Pin(9, Pin.OUT, value=1)
+#pcs = Pin(9, Pin.OUT, value=1)
+pcs = Pin(13, Pin.OUT, value=1)
 #prst = Pin(15, Pin.OUT, value=1)
-prst = Pin(8, Pin.OUT, value=1)
+#prst = Pin(8, Pin.OUT, value=1)
+#prst = Pin(7, Pin.OUT, value=1)
+prst = None
 #pbl = Pin(13, Pin.OUT, value=1)
 
 gc.collect()  # Precaution before instantiating framebuf
@@ -100,4 +104,5 @@ spi = SPI(1, 60_000_000, sck=Pin(10), mosi=Pin(11), miso=Pin(12))
 #ssd = SSD(spi, height=320, width=240, disp_mode=0, dc=pdc, cs=pcs, rst=prst)
 #ssd = SSD(spi, height=320, width=240, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
 #ssd = SSD(spi, height=240, width=320, disp_mode=PORTRAIT, dc=pdc, cs=pcs, rst=prst)
-ssd = SSD(spi, height=320, width=480,  dc=pdc, cs=pcs, rst=prst)
+#ssd = SSD(spi, height=320, width=480,  dc=pdc, cs=pcs, rst=prst)
+ssd = SSD(spi, height=480, width=320,  dc=pdc, cs=pcs, rst=prst)

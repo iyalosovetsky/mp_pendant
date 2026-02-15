@@ -194,12 +194,14 @@ class GrblState(object):
     def __init__(self,uart_grbl_mpg,
                   neo,
                   debug:bool = DEBUG,
+                  templateDir='/templates'
                   ) :
         global objgrblState
         objgrblState=self
         self.debug = debug
         self.neo = neo        
-        self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug)
+        self.templateDir = templateDir
+        self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug, templateDir=self.templateDir)
         self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
         self.rt['query4MPG'] = {'last_start': time.time_ns (), 'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
         self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
@@ -357,34 +359,34 @@ class GrblState(object):
           self.mpgCommandShow(cmd)  
       elif command=='-stepXY' :    
           self.gui.dec_stepXY()
-          if self.gui._dXY<1:
-            self.gui.neoIcon('dX {0:.1f}'.format(self.gui._dXY).replace('.',','))
+          if self.gui._dXY_jog<1:
+            self.gui.neoIcon('dX {0:.1f}'.format(self.gui._dXY_jog).replace('.',','))
           else:  
-             self.gui.neoIcon('dX {0:.0f}'.format(self.gui._dXY))
+             self.gui.neoIcon('dX {0:.0f}'.format(self.gui._dXY_jog))
       elif command=='+stepXY' :    
           self.gui.inc_stepXY()
-          if self.gui._dXY<1:
-            self.gui.neoIcon('dX {0:.1f}'.format(self.gui._dXY).replace('.',','))
+          if self.gui._dXY_jog<1:
+            self.gui.neoIcon('dX {0:.1f}'.format(self.gui._dXY_jog).replace('.',','))
           else:  
-             self.gui.neoIcon('dX {0:.0f}'.format(self.gui._dXY))
+             self.gui.neoIcon('dX {0:.0f}'.format(self.gui._dXY_jog))
       elif command=='-stepZ' :    
           self.gui.dec_stepZ()
-          if self.gui._dZ<1:
-            self.gui.neoIcon('dZ {0:.1f}'.format(self.gui._dZ).replace('.',','))
+          if self.gui._dZ_jog<1:
+            self.gui.neoIcon('dZ {0:.1f}'.format(self.gui._dZ_jog).replace('.',','))
           else:  
-             self.gui.neoIcon('dZ {0:.0f}'.format(self.gui._dZ))
+             self.gui.neoIcon('dZ {0:.0f}'.format(self.gui._dZ_jog))
       elif command=='+stepZ' :    
           self.gui.inc_stepZ()
-          if self.gui._dZ<1:
-            self.gui.neoIcon('dZ {0:.1f}'.format(self.gui._dZ).replace('.',','))
+          if self.gui._dZ_jog<1:
+            self.gui.neoIcon('dZ {0:.1f}'.format(self.gui._dZ_jog).replace('.',','))
           else:  
-             self.gui.neoIcon('dZ {0:.0f}'.format(self.gui._dZ))
+             self.gui.neoIcon('dZ {0:.0f}'.format(self.gui._dZ_jog))
       elif command=='stepXY' :    
           self.gui.stepXY()
-          self.gui.neoIcon('dXY\n{0:.1f}'.format(self.gui._dXY))
+          self.gui.neoIcon('dXY\n{0:.1f}'.format(self.gui._dXY_jog))
       elif command=='stepZ' :    
           self.stepZ()
-          self.gui.neoIcon('dZ\n{0:.1f}'.format(self.gui._dZ))
+          self.gui.neoIcon('dZ\n{0:.1f}'.format(self.gui._dZ_jog))
       elif command=='feed' : 
           self.gui.set_feedrate()
           self.gui.neoIcon('feed\n{0:.0f}'.format(self.gui._feedrateJog))

@@ -17,12 +17,15 @@ class Textbox(DObject):
         height = nlines * writer.height
         devht = writer.device.height
         devwd = writer.device.width
-        if ((row + height + 2) > devht) or ((col + width + 2) > devwd):
-            raise ValueError('Textbox extends beyond physical screen.')
+        if ((row + height + 2) > devht) :
+            raise ValueError('Textbox extends beyond physical screen on height.', row + height + 2, devht) 
+        if ((col + width + 2) > devwd):
+            raise ValueError('Textbox extends beyond physical screen on width.', col + width+2, devwd) 
         super().__init__(writer, row, col, height, width, fgcolor, bgcolor, bdcolor)
         self.nlines = nlines
         self.clip = clip
         self.lines = []
+        self.invertNLine:int=None
         self.start = 0  # Start line for display
 
     def _add_lines(self, s):
@@ -80,11 +83,13 @@ class Textbox(DObject):
         wri.setcolor(self.fgcolor, self.bgcolor)
         # Print the first (or last?) lines that fit widget's height
         #for line in self.lines[-self.nlines : ]:
+        lineno = self.start
         for line in self.lines[self.start : self.start + self.nlines]:
             Writer.set_textpos(dev, row, col)
-            wri.printstring(line)
+            wri.printstring(line,invert=(self.invertNLine is not None and lineno==self.invertNLine))
             row += ht
             col = left
+            lineno += 1
         wri.setcolor()  # Restore defaults
 
     def show(self):
