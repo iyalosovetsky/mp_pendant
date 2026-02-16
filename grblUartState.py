@@ -2,6 +2,7 @@ import time
 import machine
 from machine import UART
 from gui import Gui, VFD_YELLOW, VFD_LBLUE,VFD_WHITE
+from template import Template
 
 
 class GrblParams:
@@ -802,6 +803,14 @@ class GrblState(object):
              self.grblParams._dX2go=0.00
              self.grblParams._dY2go=0.00
              self.grblParams._dZ2go=0.00
+          elif self.gui._ui_modes[self.gui._ui_mode] == 'template':
+             print('button_yellow_callback: template mode, ',self.gui._current_template_idx)
+             if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
+                self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
+             if self.template is not None and self.template.app is not None :  
+                print('button_yellow_callback: template mode, template=',self.template.app.getGcode())
+                for cmd in self.template.app.getGcode().splitlines():
+                  self.mpgCommandShow(cmd)
           else:  
               self.gui.nextUiMode(-1) 
 

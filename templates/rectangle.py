@@ -1,27 +1,27 @@
-from turtle import left
 
 
 class App():
     __version__ = '0.1'
-    width:float = 10.0
-    height:float = 5.0
-    feed:float = 100.0
-    zfeed:float = 10.0
-    toolDiameter:float = 8.0
-    down:float =1.0
-    dz:float = 0.1
+    __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','width','height']
     
     def __init__(self):
-        #self.diameter = 20
-        #self.feed = 200
-        pass
+        self.diameter:float = 10.0
+        self.feed:float = 100.0
+        self.zfeed:float = 10.0
+        self.toolDiameter:float = 8.0
+        self.down:float =1.0
+        self.dz:float = 0.1
+        self.width:float = 10.0
+        self.height:float = 20.0
+        
         
         
     def getGcode(self):
-        cmd='G21 G17 G90 ' # Set units to millimeters, select XY plane, use absolute positioning'
+        cmd=';rectangle: width,height,feed,zfeed,toolDiameter,down,dz' # Set units to millimeters, select XY plane, use absolute positioning'
+        cmd+='\nG21 G17 G90 ' # Set units to millimeters, select XY plane, use absolute positioning'
         cmd+=f'\nG0 X0 Y0 F{self.feed}' # Rapid move to the start position (0,0) with a feed rate of 500mm/min
         cmd+=f'\nM3 S1000' # Turn on the spindle (or laser), adjust speed (S value) as needed
-        cmdOne =f'G01 X{self.width} Y0\nG01 X{self.width} Y{self.height}\nG01 X0 Y{self.height}\nG01 X0 Y0'
+        cmdOne =f'\nG01 X{self.width} Y0\nG01 X{self.width} Y{self.height}\nG01 X0 Y{self.height}\nG01 X0 Y0'
         cmd+=f'\n{cmdOne}'
         while self.down >= 0:
             cmd+=f'\nG1 Z-{self.dz} F{self.zfeed}' # Plunge the tool to a depth of -1mm
