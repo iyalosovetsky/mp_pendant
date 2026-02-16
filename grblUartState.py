@@ -73,6 +73,7 @@ NOBLINK = 4
  
 
 DEBUG= False
+MAX_UART_BUFFER_SIZE=20
 
 
 
@@ -88,6 +89,7 @@ GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MPG_INTERVAL = 500000000  # 0.5s in nanoseconds
 ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
 POP_CMD_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
+POP_UART_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 RUN_NOW_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 
 
@@ -171,9 +173,10 @@ class GrblState(object):
 
     
     uartInNewData:int = -1
-    bufferUartIn=['','','',''] #
-    bufferUartPos:int = 0
-    bufferUartPrev:int = 0
+    bufferUartIn=[] #
+    bufferUartInCounter=0
+    #bufferUartPos:int = 0
+    #bufferUartPrev:int = 0
  
 
     
@@ -203,10 +206,12 @@ class GrblState(object):
         self.neo = neo        
         self.templateDir = templateDir
         self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug, templateDir=self.templateDir)
-        self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
-        self.rt['query4MPG'] = {'last_start': time.time_ns (), 'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
-        self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
-        self.rt['autoQuery2grbl'] = {'last_start': time.time_ns (), 'interval': GRBL_QUERY_INTERVAL_IDLE, 'proc': self.autoQuery2grbl , 'last_error': 0}
+        self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'disabled': False, 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
+        self.rt['query4MPG'] = {'last_start': time.time_ns (), 'disabled': False,'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
+        self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
+        self.rt['autoQuery2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': GRBL_QUERY_INTERVAL_IDLE, 'proc': self.autoQuery2grbl , 'last_error': 0}
+        self.rt['parseUartBuffer'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_UART_GRBL_INTERVAL, 'proc': self.parseUartBuffer , 'last_error': 0}
+        
         
         # if st.need_query:
     #     st.send2grblOne('?') # get status from grbl cnc machine    
@@ -240,6 +245,8 @@ class GrblState(object):
     #main real time loop
     def p_RTLoop(self):
         for key, value in self.rt.items ():
+            if value['disabled']:
+               continue
             l_time = time.time_ns ()
             l_timeprev = value['last_start']
             if value['proc'] is not None:
@@ -265,6 +272,17 @@ class GrblState(object):
         if id in self.rt:
           if self.rt[id]['interval'] != interval:
             self.rt[id]['interval'] = interval
+
+
+    def p_RTSetDisabled(self,id:str,value:bool):
+        if id in self.rt:
+          if self.rt[id]['disabled'] != value:
+            self.rt[id]['disabled'] = value
+            if value:
+               self.rt[id]['last_start'] = time.time_ns()- int(self.rt[id]['interval']*.5)
+               
+
+
 
 
             
@@ -296,8 +314,14 @@ class GrblState(object):
     #G10L20P1Y0 work pos zero
 
     def mpgCommandShow(self, command:str):
+       try:   
+          self.p_RTSetDisabled(id='autoQuery2grbl',value=True)
           self.gui.neoLabel(command,id='cmd')  
-          self.mpgCommand(command+'\r\n')  
+          self.mpgCommand(command+'\r\n') 
+       except Exception as e:
+          print ('error mpgCommandShow '+command , e)
+       finally:
+          self.p_RTSetDisabled(id='autoQuery2grbl',value=False)       
     
     def toggleMPG(self):
         self.gui.neoLabel("#",id='cmd')
@@ -437,7 +461,9 @@ class GrblState(object):
     def send2grbl(self,command:str):        
       #if DEBUG or (command is not None and command!='' and not command.startswith('?')) :
       #  print('send2grbl:',command,' queueLen=',len(self.grblCmd2send), self._execProgress)
-      self.grblCmd2send.append(command)
+      if command.strip() == '':
+         return 
+      self.grblCmd2send.append(command.strip())
       if self._grblExecProgress!='do':
           self.popCmd2grbl()
 
@@ -649,29 +675,54 @@ class GrblState(object):
       self.gui.neoLabel(text=self.editCmd,id='cmd')
       
 
+    # def procUartInByte(self,chars):
+    #   # Process the bytes (e.g., print its integer value or character)
+    #   if len(chars)>0:
+    #         if self.debug:
+    #             print(chars.decode())
+    #         self.bufferUartIn[self.bufferUartPos]=chars.decode()
+    #         self.parseState(self.bufferUartIn[self.bufferUartPos])
+    #         self.gui.displayState()
+    #         self.bufferUartPrev=self.bufferUartPos
+    #         if self.bufferUartPos>=len(self.bufferUartIn)-1:
+    #             self.bufferUartPos=0
+    #         else:    
+    #             self.bufferUartPos+=1
+    #         self.uartInNewData=self.bufferUartPrev    # new line in cycle buffer
+            
+
     def procUartInByte(self,chars):
       # Process the bytes (e.g., print its integer value or character)
       if len(chars)>0:
             if self.debug:
                 print(chars.decode())
-            self.bufferUartIn[self.bufferUartPos]=chars.decode()
-            self.parseState(self.bufferUartIn[self.bufferUartPos])
-            self.gui.displayState()
-            self.bufferUartPrev=self.bufferUartPos
-            if self.bufferUartPos>=len(self.bufferUartIn)-1:
-                self.bufferUartPos=0
-            else:    
-                self.bufferUartPos+=1
-            self.uartInNewData=self.bufferUartPrev    # new line in cycle buffer
+            while len(self.bufferUartIn)>MAX_UART_BUFFER_SIZE:
+               self.bufferUartIn.pop(0)
+                   
+            self.bufferUartInCounter+=1
+            self.bufferUartIn.append([self.bufferUartInCounter,chars.decode()])      
+
+            
+                        
             
             
-    def procUartGetLastData(self, printEnable=False):
-        if self.uartInNewData>=0:
-            self.uartInNewData=-1
-            if printEnable and self.bufferUartIn[self.uartInNewData]!='':
-                print(self.bufferUartIn[self.uartInNewData])
-            return self.bufferUartIn[self.uartInNewData]
-        return None
+
+
+    def parseUartBuffer(self):
+       while len(self.bufferUartIn)>0:        
+          self.last_uart_mess=self.bufferUartIn.pop(0)
+          self.parseState(self.last_uart_mess[1])
+          self.gui.displayState()
+
+
+
+    # def procUartGetLastData(self, printEnable=False):
+    #     if self.uartInNewData>=0:
+    #         self.uartInNewData=-1
+    #         if printEnable and self.bufferUartIn[self.uartInNewData]!='':
+    #             print(self.bufferUartIn[self.uartInNewData])
+    #         return self.bufferUartIn[self.uartInNewData]
+    #     return None
     
 
     
@@ -808,9 +859,21 @@ class GrblState(object):
              if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
                 self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
              if self.template is not None and self.template.app is not None :  
-                print('button_yellow_callback: template mode, template=',self.template.app.getGcode())
-                for cmd in self.template.app.getGcode().splitlines():
-                  self.mpgCommandShow(cmd)
+                
+                ii=0
+                cmds=self.template.app.getGcode()
+                if isinstance(cmds,str):
+                  print('button_yellow_callback: template mode, string mode template=',cmds)
+                  cmds=cmds.splitlines()
+                else:
+                  print('button_yellow_callback: template mode, list mode  template=',cmds)
+
+
+                  
+                for cmd in cmds:
+                    self.send2grbl(cmd)
+                    ii+=1
+                print('len 2send',len(self.grblCmd2send),ii)  
           else:  
               self.gui.nextUiMode(-1) 
 

@@ -166,7 +166,7 @@ class Gui(object ):
        self.templateDir = templateDir 
 
        try:
-            self.templ_files = os.listdir(self.templateDir)
+            self.templ_files = [ff.replace('.py','') for ff in os.listdir(self.templateDir)  if not (ff.startswith('templateGcode') or ff.startswith('_'))]
             self._current_template_idx=0
        except OSError:
             print("Error: No templates directory found.")

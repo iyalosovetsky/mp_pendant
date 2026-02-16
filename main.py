@@ -91,4 +91,4 @@ while True:
         kbd.proceedChars(proceedCh, False)
         
             
-    time.sleep(0.1) # Small delay to prevent a hard loop
+    time.sleep(0.05) # Small delay to prevent a hard loop
