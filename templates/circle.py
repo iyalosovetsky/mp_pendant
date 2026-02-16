@@ -2,7 +2,7 @@ from templates.templateGcode import TemplateGcode
 
 class App(TemplateGcode):
     __version__ = '0.1'
-    __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__shape__']
+    __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__shape__','__z']
     
     
     def __init__(self):
@@ -13,6 +13,7 @@ class App(TemplateGcode):
         self.down:float =1.0
         self.dz:float = 0.1
         self.__shape__  = 'circle'
+        self.__z:float = 0.0
         
   
     
