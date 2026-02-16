@@ -21,5 +21,5 @@ class App(TemplateGcode):
     
 
     def getOneLayerGcode(self):
-        return f'G02 X0 Y0 I{self.diameter/2} J0'.splitlines() # Clockwise arc back to the start point (X0 Y0) with I offset 10 (center is at X10)
+        return f'G02 X0 Y0 I{self.diameter/2} J0 F{self.feed}'.splitlines() # Clockwise arc back to the start point (X0 Y0) with I offset 10 (center is at X10)
 

@@ -20,4 +20,4 @@ class App(TemplateGcode):
     
 
     def getOneLayerGcode(self):
-        return f'G1 X{self.width} Y0\nG1 X{self.width} Y{self.width}\nG1 X0 Y{self.width}\nG1 X0 Y0'.splitlines()
+        return f'G1 X{self.width} Y0 F{self.feed}\nG1 X{self.width} Y{self.width}\nG1 X0 Y{self.width}\nG1 X0 Y0'.splitlines()
