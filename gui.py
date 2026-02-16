@@ -694,7 +694,6 @@ class Gui(object ):
         self._pressedX = x
         self._pressedY = y
         
-        
 
         for label in self.labels:
             if label in ('x','y','z','<','>','term','dXY','dZ','feed'):
@@ -710,7 +709,6 @@ class Gui(object ):
         elif self.debug:
             self.neoPressedDrawPoint()
 
-            
 
     def nextUiMode(self, direction):
         self._ui_mode+=direction

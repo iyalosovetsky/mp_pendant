@@ -228,13 +228,7 @@ class GrblState(object):
         # self.time2query = time.time_ns()
         # self.MPG_time2query = time.time_ns()
         
-
-
-
-
-        
-
-
+      
         
         if  self.uart_grbl_mpg!=None :
             self.uart_grbl_mpg.irq(handler=uart_callback, trigger=UART.IRQ_RXIDLE, hard=False) # 'hard=False' is often required
@@ -762,12 +756,6 @@ class GrblState(object):
           self.gui.upd_rotary()
  
 
-
-
-
-
-          
-       
 
 
     def button_red_callback(self,pin,button): # right key
