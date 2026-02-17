@@ -3,7 +3,7 @@ import machine
 from machine import UART
 from gui import Gui, VFD_YELLOW, VFD_LBLUE,VFD_WHITE
 from template import Template
-
+from nanoguilib.label import ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER 
 
 class GrblParams:
     """
@@ -835,7 +835,6 @@ class GrblState(object):
              if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
                 self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
              if self.template is not None and self.template.app is not None :  
-                print('point122', self.template.params)
                 
                 ii=0
                 cmds=self.template.app.getGcode()
@@ -846,13 +845,20 @@ class GrblState(object):
                   print('button_yellow_callback: template mode, list mode  template=',cmds)
 
 
-                  
+
+
+
                 for cmd in cmds:
                     #self.send2grbl(cmd) todo unmark after develop
                     ii+=1
                     if ii==1:
                        print('point11',cmd)
-                print('len 2send',len(self.grblCmd2send),ii)  
+                print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
+                self.gui.neoDisplayTemplate(params=self.template.params,template_name =self.template.template_name)
+
+
+
+
           else:  
               self.gui.nextUiMode(-1) 
 

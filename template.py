@@ -1,6 +1,7 @@
 
 import gc
 
+loaded_app= None
 class Template:
     """
     A class to hold grbl parameters.
@@ -20,6 +21,8 @@ class Template:
         self.diameter:float = diameter
         self.down:float = down  
         self.dz:float = dz
+        global loaded_app
+        loaded_app=None
         self.app=None
         self.template_name=template_name.replace('.py','')
         self.template_dir=template_dir
@@ -29,44 +32,47 @@ class Template:
         
     
     def loadApp(self ):
+        global loaded_app
         try:
-            self.app = None
+            loaded_app = None
             gc.collect()
             module_name = f'{self.template_dir}.{self.template_name.lower()}'
             module = __import__(module_name, globals(), locals(), ['App'])
-            self.app = module.App()
+            global loaded_app 
+            loaded_app = module.App()
+            self.app=loaded_app
 
         except Exception as e:
             print(f"Error loading app for macro '{self.template_name}': {e}")
             self.app = None
     
     def setParams(self, **kwargs):
-        if self.app is None:
+        if loaded_app is None:
             return
-        for key in self.app.__slots__:
-            print('key=',key)
+        for key in loaded_app.__slots__:
+            #print('key=',key)
             if key.startswith('__'):
                 continue
             if key in kwargs:
-                print(f"{key} in defaults and  equals " , kwargs.get(key))
+                #print(f"{key} in defaults and  equals " , kwargs.get(key))
                 self.params[key]=kwargs.get(key)
-            elif hasattr(self.app, key): 
-                print(f"{key} found in app ")
+            elif hasattr(loaded_app, key): 
+                #print(f"{key} found in app ")
                 vv=None
-                vv=eval('self.app.'+key)
+                #vv=eval('loaded_app.'+key)
                 try:
-                    vv=eval('self.app.'+key)  
+                    vv=eval('loaded_app.'+key)  
                 except AttributeError:
                     print('Attribute not found', key)  
                 except NameError :    
-                    print('Name error not found', 'self.app.'+key)  
+                    print('Name error not found', 'loaded_app.'+key)  
                 if vv is not None:
-                    print(f"{key} found in app and added to params with  ",vv)
+                    #print(f"{key} found in app and added to params with  ",vv)
                     self.params[key]=vv    
             else: 
                 print('Warning Attribute not found in template but declared', key)  
 
-        print('found params',self.params)            
+        #print('Template.setParams: found params',self.params)            
              
 
     def getGcode(self):
