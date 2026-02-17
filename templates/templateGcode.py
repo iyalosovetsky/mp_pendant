@@ -1,10 +1,11 @@
 class TemplateGcode():
     __version__ = '0.1'
-    __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__z']
+    #__slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__z']
+    __slots__ = ['feed','zfeed','toolDiameter','down','dz','__z']
     
     
     def __init__(self):
-        self.diameter:float = 10.0
+        #self.diameter:float = 10.0
         self.feed:float = 100.0
         self.zfeed:float = 10.0
         self.toolDiameter:float = 8.0
@@ -26,7 +27,7 @@ class TemplateGcode():
         return cmd
     
     def getDzGcode(self):
-        return 'G1 Z{z} F{zfeed}'.splitlines() # Plunge the tool to a depth of -1mm
+        return ['G1 Z{z} F{zfeed}'] # Plunge the tool to a depth of -1mm
 
 
     def getEndGcode(self):

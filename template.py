@@ -6,7 +6,7 @@ class Template:
     A class to hold grbl parameters.
     Using __slots__ for memory optimization.
     """
-    __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','width','height']
+    #__slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','width','height','app']
 
     def __init__(self, template_name:str, template_dir:str='/templates',
                  diameter:float = 10.0, feed:float = 100.0, zfeed:float = 10.0, 
@@ -23,8 +23,10 @@ class Template:
         self.app=None
         self.template_name=template_name.replace('.py','')
         self.template_dir=template_dir
+        self.params={}
         self.loadApp()
-        self.setParams(diameter=diameter, feed=feed, zfeed=zfeed, toolDiameter=toolDiameter, down=down, dz=dz, width=width, height=height)
+        self.setParams(feed=feed, zfeed=zfeed, toolDiameter=toolDiameter, down=down, dz=dz)
+        
     
     def loadApp(self ):
         try:
@@ -33,6 +35,7 @@ class Template:
             module_name = f'{self.template_dir}.{self.template_name.lower()}'
             module = __import__(module_name, globals(), locals(), ['App'])
             self.app = module.App()
+
         except Exception as e:
             print(f"Error loading app for macro '{self.template_name}': {e}")
             self.app = None
@@ -40,11 +43,31 @@ class Template:
     def setParams(self, **kwargs):
         if self.app is None:
             return
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            else:
-                print(f"Warning: Parameter '{key}' does not exist in macro '{self.__class__.__name__}'")
+        for key in self.app.__slots__:
+            print('key=',key)
+            if key.startswith('__'):
+                continue
+            if key in kwargs:
+                print(f"{key} in defaults and  equals " , kwargs.get(key))
+                self.params[key]=kwargs.get(key)
+            elif hasattr(self.app, key): 
+                print(f"{key} found in app ")
+                vv=None
+                vv=eval('self.app.'+key)
+                try:
+                    vv=eval('self.app.'+key)  
+                except AttributeError:
+                    print('Attribute not found', key)  
+                except NameError :    
+                    print('Name error not found', 'self.app.'+key)  
+                if vv is not None:
+                    print(f"{key} found in app and added to params with  ",vv)
+                    self.params[key]=vv    
+            else: 
+                print('Warning Attribute not found in template but declared', key)  
+
+        print('found params',self.params)            
+             
 
     def getGcode(self):
         if self.app is None:

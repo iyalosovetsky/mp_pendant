@@ -157,7 +157,7 @@ class GrblState(object):
     
 
     _parse_state_code:str='init'
-    sendedQuery2grblCounter:int = 0
+    #sendedQuery2grblCounter:int = 0
     
     _query4MPG_countDown:int = 10
     # time2query:int = time.time_ns()
@@ -310,7 +310,7 @@ class GrblState(object):
 
       if not command.startswith('?'):
           self.query_now('mpgCommand')
-          self.sendedQuery2grblCounter = 0
+          #self.sendedQuery2grblCounter = 0
 
     #jog $J=G91 X0 Y-5 F600
     #$J=G91 X1 F100000
@@ -348,16 +348,16 @@ class GrblState(object):
         #self.flashKbdLEDs(LED_ALL , BLINK_2) ##7 - 3 leds       # 1 - macro1
         self.mpgCommand(command)
         if command !='?':
-          self.sendedQuery2grblCounter = 0
+          #self.sendedQuery2grblCounter = 0
           self.gui.neoLabel(command,id='cmd')
         else:
           if self.editCmd!='':
             self.grblCmd2send=[]
-          else: 
-             self.sendedQuery2grblCounter+=1
-             if  self.sendedQuery2grblCounter>10:
-                self.sendedQuery2grblCounter = 0
-                self.gui.neoLabel('',id='cmd')
+          #else: 
+          #   #self.sendedQuery2grblCounter+=1
+          #   #if  self.sendedQuery2grblCounter>10:
+          #   #   self.sendedQuery2grblCounter = 0
+          #   #   self.gui.neoLabel('',id='cmd')
       elif command=='-y':
           self.gui.grblJog(y=-self.step)
       elif  command=='+y':
@@ -673,26 +673,9 @@ class GrblState(object):
 
 
     def neoShowEdit(self):
-      self.sendedQuery2grblCounter = 0
-      # self.neoIdle()
       self.gui.neoLabel(text=self.editCmd,id='cmd')
       
-
-    # def procUartInByte(self,chars):
-    #   # Process the bytes (e.g., print its integer value or character)
-    #   if len(chars)>0:
-    #         if self.debug:
-    #             print(chars.decode())
-    #         self.bufferUartIn[self.bufferUartPos]=chars.decode()
-    #         self.parseState(self.bufferUartIn[self.bufferUartPos])
-    #         self.gui.displayState()
-    #         self.bufferUartPrev=self.bufferUartPos
-    #         if self.bufferUartPos>=len(self.bufferUartIn)-1:
-    #             self.bufferUartPos=0
-    #         else:    
-    #             self.bufferUartPos+=1
-    #         self.uartInNewData=self.bufferUartPrev    # new line in cycle buffer
-            
+     
 
     def procUartInByte(self,chars):
       # Process the bytes (e.g., print its integer value or character)
@@ -719,16 +702,6 @@ class GrblState(object):
 
 
 
-    # def procUartGetLastData(self, printEnable=False):
-    #     if self.uartInNewData>=0:
-    #         self.uartInNewData=-1
-    #         if printEnable and self.bufferUartIn[self.uartInNewData]!='':
-    #             print(self.bufferUartIn[self.uartInNewData])
-    #         return self.bufferUartIn[self.uartInNewData]
-    #     return None
-    
-
-    
     
     # event when grbl machine pos changed
     def changeMpos(self, xyz):
@@ -862,6 +835,7 @@ class GrblState(object):
              if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
                 self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
              if self.template is not None and self.template.app is not None :  
+                print('point122', self.template.params)
                 
                 ii=0
                 cmds=self.template.app.getGcode()
@@ -874,8 +848,10 @@ class GrblState(object):
 
                   
                 for cmd in cmds:
-                    self.send2grbl(cmd)
+                    #self.send2grbl(cmd) todo unmark after develop
                     ii+=1
+                    if ii==1:
+                       print('point11',cmd)
                 print('len 2send',len(self.grblCmd2send),ii)  
           else:  
               self.gui.nextUiMode(-1) 

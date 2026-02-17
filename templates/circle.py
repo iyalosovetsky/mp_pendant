@@ -4,16 +4,18 @@ class App(TemplateGcode):
     __version__ = '0.1'
     __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__shape__','__z']
     
+    diameter:float = 10.0
+    feed:float = 100.0
+    zfeed:float = 10.0
+    toolDiameter:float = 8.0
+    down:float =1.0
+    dz:float = 0.1
+    __shape__  = 'circle'
+    __z:float = 0.0
     
     def __init__(self):
-        self.diameter:float = 10.0
-        self.feed:float = 100.0
-        self.zfeed:float = 10.0
-        self.toolDiameter:float = 8.0
-        self.down:float =1.0
-        self.dz:float = 0.1
-        self.__shape__  = 'circle'
-        self.__z:float = 0.0
+        pass
+        
         
   
     

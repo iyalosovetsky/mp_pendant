@@ -153,6 +153,8 @@ class Gui(object ):
     debug:bool = DEBUG
     enable_invert_on_select = True
     templ_files = []
+    labels = {}  # dictionary of configured messages_labels
+    template_params = {}  # dictionary to store params of template macro
 
 
 
@@ -226,6 +228,7 @@ class Gui(object ):
 
 
         self.labels = {}  # dictionary of configured messages_labels
+        self.template_params = {}  # dictionary of configured messages_labels
         self.help = [
            '^r reboot',
            '^c cancel',
@@ -328,11 +331,12 @@ class Gui(object ):
         if  id not in self.labels:
             return
         self.labels[id].text = text
+        if id=='state':
+          self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
         
 
 
  
-
 
 
         if hidden is not None :
@@ -343,8 +347,6 @@ class Gui(object ):
           if self.labels[id].hidden  :
                 self.neoDraw(id, currentLine=currentLine)
           return  
-        if id=='state':
-          self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
 
         
             
@@ -365,7 +367,6 @@ class Gui(object ):
 
 
 
-             
         self.neoDraw(id, currentLine=currentLine)     
 
     # ui terminal line position decrease
@@ -507,7 +508,6 @@ class Gui(object ):
                     self.labels[id].label.clear()
                  else:
                     self.labels[id].label.value('')
-                       
                  return    
             if isinstance(self.labels[id].label,Textbox )  :
               if self.labels[id].invert:
@@ -517,6 +517,12 @@ class Gui(object ):
               self.labels[id].label.clear()
               self.labels[id].label.fgcolor=self.labels[id].fgcolor
               self.labels[id].label.append(self.labels[id].text[ : self.labels[id].chars])
+              self.labels[id].label.invertNLine=currentLine
+              if currentLine is not None and self.labels[id].label.nlines>=(currentLine):
+                 self.labels[id].label.goto(currentLine)
+              else:
+                 self.labels[id].label.goto(0)
+
 
             else:   
               if self.labels[id].charsl-len(self.labels[id].text)>0  and (self.labels[id].align is None or self.labels[id].align==ALIGN_LEFT) :
@@ -696,6 +702,7 @@ class Gui(object ):
 
         self._ui_confirm='unkn'
         if self._ui_modes[self._ui_mode] in ('main','drive'):
+          self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
           self.rotaryObj[0]['axe']='x'
           self.neoIcon(text=self._ui_modes[self._ui_mode])
           self.grblParams._dX2go=0.0
@@ -716,6 +723,8 @@ class Gui(object ):
           self.initRotaryStart()
           self.neoHighLight(id='term')
           self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
+          self.neoLabel('','info',hidden=True, force=True)
+
 
 
     def enterConfirmMode(self):
@@ -934,8 +943,10 @@ class Gui(object ):
                 self._current_template_idx=index
             self.initRotaryStart()  
             self.rotaryObj[rotN]['updated'] = True
-            #print('  new pos val, from',self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'])
-            self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
+            #print('  new pos val, from',self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'],'self._current_template_idx',self._current_template_idx)
+            #self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )
+            self.neoDraw('term', currentLine=self._current_template_idx)
+            
 
 
     # def upd_rotary_on_feedJog(self,rotN:int):
