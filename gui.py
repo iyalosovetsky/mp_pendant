@@ -79,6 +79,7 @@ class NeoLabelObj(object):
         self.text=  text
         self.scale= scale
         self.fgcolor= fgcolor
+        self.fgcolor_default= fgcolor
         self.bdcolor= bdcolor
         self.invert= invert
         self.nlines = nlines  
@@ -323,78 +324,49 @@ class Gui(object ):
 
 
     # ui label`s updater
-    def neoLabel(self,text,id='info',color=None,currentLine=None):
+    def neoLabel(self,text,id='info',color=None,currentLine=None, hidden=None, force=False):
+        if  id not in self.labels:
+            return
+        self.labels[id].text = text
         
-        color = color2rgb(color)
-        l_id=id
-        if id=='x':
-          self.labels[id].text = text
-        elif id=='y': 
-          self.labels[id].text = text
-        elif id=='z':
-          self.labels[id].text = text
-        elif id=='mx':
-          self.labels[id].text = text
-        elif id=='my': 
-          self.labels[id].text = text
-        elif id=='mz':
-          self.labels[id].text = text  
-        elif id=='cmd':
-          self.labels[id].text = text
-          if color is None:
-             self.labels[id].fgcolor=VFD_YELLOW
-        elif id=='state':
-          self.labels[id].text = text+(' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
-          if color is None and text.lower().startswith('alarm'):
-             self.labels[id].fgcolor=VFD_RED
-          elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
-             self.labels[id].fgcolor=VFD_GREEN
-          elif color is None:
-             self.labels[id].fgcolor=VFD_WHITE
-          else:   
-             self.labels[id].fgcolor=color
-        elif id=='feed':
-          self.labels[id].text = text
-          if color is None and text.lower().startswith('alarm'):
-             self.labels[id].fgcolor=VFD_RED
-          elif color is None and (text.lower().startswith('run') or text.lower().startswith('jog')):
-             self.labels[id].fgcolor=VFD_GREEN
-          elif color is None:
-             self.labels[id].fgcolor=VFD_WHITE
-          else:   
-             self.labels[id].fgcolor=color             
-        elif id=='icon':
-          self.labels['term'].hidden=(len(text.strip())>2)
-          self.labels[id].text = text
-          if color is None:
-             self.labels[id].fgcolor=VFD_GREEN
-          else:   
-             self.labels[id].fgcolor=color
 
-        elif id=='term':
-          self.labels[id].text = text
-          if color is None:
+
+ 
+
+
+
+        if hidden is not None :
+          if hidden and self.labels[id].hidden and not force:
+              return
+          self.labels[id].hidden = hidden
+          
+          if self.labels[id].hidden  :
+                self.neoDraw(id, currentLine=currentLine)
+          return  
+        if id=='state':
+          self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
+
+        
+            
+        if id=='state' and text.lower().startswith('alarm'):
+             self.labels[id].fgcolor=VFD_RED
+        elif id=='state' and  (text.lower().startswith('run') or text.lower().startswith('jog')):
              self.labels[id].fgcolor=VFD_GREEN
-          else:   
-             self.labels[id].fgcolor=color
-        elif id=='info':
-          self.labels[id].text = text
-          if color is None:
-             self.labels[id].fgcolor=VFD_LBLUE if self.grblParams._mpg  else VFD_WHITE
-          else:   
-             self.labels[id].fgcolor=color
-        elif id in ('dXY','dZ'):
-          self.labels[id].text = text
-          if color is not None:
-             self.labels[id].fgcolor=color
-          elif color is None and ((self._ui_modes[self._ui_mode] == 'scaleZ' and id=='dZ') or (self._ui_modes[self._ui_mode] == 'scaleXY' and id=='dXY')):
-             self.labels[id].fgcolor=VFD_YELLOW 
-          else:
-             self.labels[id].fgcolor=VFD_WHITE
+        elif id=='feed' and text.lower().startswith('alarm'):
+             self.labels[id].fgcolor=VFD_RED
+        elif id=='feed' and (text.lower().startswith('run') or text.lower().startswith('jog')):
+             self.labels[id].fgcolor=VFD_GREEN
+        elif id=='info' and  self.grblParams._mpg:
+             self.labels[id].fgcolor=VFD_LBLUE
+        elif color is not None:
+             self.labels[id].fgcolor=color2rgb(color)
+        else:   
+             self.labels[id].fgcolor= self.labels[id].fgcolor_default      
+
+
+
              
-        else:
-            l_id=None
-        self.neoDraw(l_id, currentLine=currentLine)     
+        self.neoDraw(id, currentLine=currentLine)     
 
     # ui terminal line position decrease
     def decTermLinePos(self):
@@ -529,7 +501,14 @@ class Gui(object ):
     def neoDraw(self,id, currentLine=None):
         if id is not None:
             if DEBUG:
-                print('neoDraw['+id+']',self.labels[id].x,self.labels[id].y,self.labels[id].fgcolor,self.labels[id].text)
+                print('neoDraw['+id+']',self.labels[id].x,self.labels[id].y,self.labels[id].fgcolor,self.labels[id].text,self.labels[id].hidden)
+            if self.labels[id].hidden:
+                 if isinstance(self.labels[id].label,Textbox )  :
+                    self.labels[id].label.clear()
+                 else:
+                    self.labels[id].label.value('')
+                       
+                 return    
             if isinstance(self.labels[id].label,Textbox )  :
               if self.labels[id].invert:
                 self.labels[id].label.bdcolor=VFD_LBLUE
@@ -538,12 +517,7 @@ class Gui(object ):
               self.labels[id].label.clear()
               self.labels[id].label.fgcolor=self.labels[id].fgcolor
               self.labels[id].label.append(self.labels[id].text[ : self.labels[id].chars])
-              if currentLine is not None:
-                  self.labels[id].label.invertNLine=currentLine
-                  self.labels[id].label.goto(currentLine)
-              else:  
-                  self.labels[id].label.invertNLine=None
-                  self.labels[id].label.goto(0)
+
             else:   
               if self.labels[id].charsl-len(self.labels[id].text)>0  and (self.labels[id].align is None or self.labels[id].align==ALIGN_LEFT) :
                   self.labels[id].label.value( self.labels[id].text + ( " " * (self.labels[id].charsl + (1 if id not in('xyz') else 0)  - len(self.labels[id].text) ))   ,fgcolor=self.labels[id].fgcolor, align=self.labels[id].align, invert=self.labels[id].invert,bdcolor=self.labels[id].bdcolor)
@@ -669,7 +643,7 @@ class Gui(object ):
         if id in self.labels:
               if not self.labels[id].invert:
                   self.labels[id].invert = True
-                  self.labels[id].label.show()
+                  #self.labels[id].label.show()
                   if id in ('x','y','z','dXY','dZ','feed') and self.rotaryObj[0]['axe']!=id:
                     self.rotaryObj[0]['axe'] = id
                     if id in ('x','y','z'):
@@ -679,7 +653,7 @@ class Gui(object ):
                   self.neoDraw(id)
               for label in self.labels:
                   if label!=id:
-                    if  self.labels[label].invert :
+                    if  self.labels[label].invert and not self.labels[label].hidden:
                         self.labels[label].invert = False
                         if id in ('x','y','z'):
                             self.neoWorkCoordinate(id=id)
@@ -696,7 +670,7 @@ class Gui(object ):
         
 
         for label in self.labels:
-            if label in ('x','y','z','<','>','term','dXY','dZ','feed'):
+            if label in ('x','y','z','<','>','term','dXY','dZ','feed') and not self.labels[label].hidden:
                if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
                  and y>=self.labels[label].y-2 and y<=self.labels[label].y+self.labels[label].height+2:
                    self._highlightedArea=label

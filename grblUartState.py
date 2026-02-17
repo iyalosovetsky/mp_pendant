@@ -252,6 +252,9 @@ class GrblState(object):
             if value['proc'] is not None:
                 if (((l_time - l_timeprev) > value['interval'])) :
                     value['last_start'] = l_time
+                    value['last_error'] = value['proc'] ()
+                    # if value['last_error'] is None:
+                    #         value['last_error'] = 0
                     try:  
                         value['last_error'] = value['proc'] ()
                         if value['last_error'] is None:
@@ -881,10 +884,8 @@ class GrblState(object):
     def button_yellow_callback_long(self,pin ,button):
         print('button_yellow_callback_long')
         if self._grblExecProgress in ('do','doing','alarm','error'):
-            print ('button_yellow_callback_long: scip on _grblExecProgress=',self._grblExecProgress)
+            print ('button_yellow_callback_long: skip on _grblExecProgress=',self._grblExecProgress)
             return        
         if self.gui._ui_modes[self.gui._ui_mode] in ( 'main'):
-          print('button_yellow_callback_long point2')
           if self.gui.rotaryObj[0]['axe'] in ('x','y','z'):
-            print('button_yellow_callback_long point3')
             self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
