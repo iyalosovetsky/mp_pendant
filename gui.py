@@ -92,7 +92,7 @@ class NeoLabelObj(object):
           self.width= self.label.width
         else:
           self.width= self.label.width + self.fldLabel.width  
-          
+
           
           
         self.oneWidth= oneWidth
@@ -736,7 +736,7 @@ class Gui(object ):
         elif self._ui_modes[self._ui_mode] in ('template') :  
               
            for label in self.templ_labels:
-              if x>=self.templ_labels[label].x-50 and x<=self.templ_labels[label].x+self.templ_labels[label].width \
+              if x>=self.templ_labels[label].x-5 and x<=self.templ_labels[label].x+self.templ_labels[label].width \
                   and y>=self.templ_labels[label].y-10 and y<=self.templ_labels[label].y+self.templ_labels[label].height+10:
                     self._highlightedArea=label
                     break
