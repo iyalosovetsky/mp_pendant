@@ -1,6 +1,5 @@
 *.pyc
 __pycache__/*
-templates/__pycache__
-templates/__pycache__/*
+templates/__pycache__PFrhbnb
 templates/__pycache__/circle.cpython-313.pyc
 templates/__pycache__/quadrant.cpython-313.pyc

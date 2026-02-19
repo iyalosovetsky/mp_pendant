@@ -851,10 +851,10 @@ class GrblState(object):
                 for cmd in cmds:
                     #self.send2grbl(cmd) todo unmark after develop
                     ii+=1
-                    if ii==1:
-                       print('point11',cmd)
+                    #if ii==1:
+                    #   print('point11',cmd) 
                 print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
-                self.gui.neoDisplayTemplate(params=self.template.params,template_name =self.template.template_name)
+                self.gui.neoDisplayTemplate(template_name =self.template.template_name)
 
 
 

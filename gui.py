@@ -14,6 +14,7 @@ import os
 
 
 Y_POS_LABEL_PARAMS=280
+PARAMS_IN_ROW=3
 
 VFD0_PURPLE = 0x00FFD2
 VFD0_GREEN = 0x30BF30
@@ -75,11 +76,12 @@ DEBUG= False
 
 class NeoLabelObj(object):
     def __init__(self, fgcolor:int , scale:float,x:int,y:int,text:str = '',label=None,fldLabel=None,
-                 oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT, bdcolor=None, invert=False, hidden = False):
+                 oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT, bdcolor=None, invert=False, hidden = False,rotaryScale=1.0):
         self.x= x
         self.y= y
         self.text=  text
         self.scale= scale
+        self.rotaryScale= rotaryScale
         self.fgcolor= fgcolor
         self.fgcolor_default= fgcolor
         self.bdcolor= bdcolor
@@ -173,7 +175,7 @@ class Gui(object ):
             ('mz', '     '       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
             ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
             ('dZ', 'dZ'          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
-            ('cmd', '     '      , 'white'         ,    0, 260,  2, 308    ,1, ALIGN_LEFT),  #14*22
+            ('cmd', '     '      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
             ('feed', '1000'    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
             ('state', 'Idle MPG G59'    , 'white'         ,  6*20,  0,  2, 310-120,1, ALIGN_LEFT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
@@ -258,7 +260,7 @@ class Gui(object ):
        self.templ_labels = {}  # dictionary of configured messages_labels
                  
     # initialize neo display labels
-    def neoDrawAreas(self, config_array=[],params={}):
+    def neoDrawAreas(self, config_array=[]):
         labels = {}  # dictionary of configured messages_labels
         for c1 in config_array:
             (name, textline, fgcolor, x, y, scale, width, nlines,align ) = c1  # unpack tuple into five var names
@@ -272,15 +274,19 @@ class Gui(object ):
               #writerDt = CWriter(self.neo, fixed, verbose=self.debug)
               #writerDt.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
 
-              name2=name[p+1:][:8]
+              name2=name[p+1:]
               #print('neoDrawAreas:',name2, name, textline, fgcolor, x, y, scale, width, nlines,align)
               #self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
               flw=writer.stringlen('quadrant ')+2
               fl=Label(writer, y, x, flw,fgcolor=VFD_GREEN)
-              fl.value(name2.upper()+' ',fgcolor=VFD_GREEN)
+              fl.value((name2[:8]).upper()+' ',fgcolor=VFD_GREEN)
               ll=Label(writer, y, x+flw, writer.stringlen('-9999.99'), bdcolor=False, align=align)
-              ll.value('{:6.2f}'.format(params.get(name2,00.01)), fgcolor=fgcolor)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
+              val=self.grblParserObj.template.params.get(name2,00.01)
+              ll.value('{:6.2f}'.format(val), fgcolor=fgcolor)
+
+              rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
+              print('rotaryScale',rotaryScale,name,name2)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
             elif name in ('xyz'):
               # self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
               flw=writer.stringlen(name.upper()+': ')
@@ -289,12 +295,13 @@ class Gui(object ):
               ll=Label(writer, y, x+flw, writer.stringlen('-999.99'), bdcolor=False, align=align)
               ll.value('{:6.2f}'.format(-123.01), fgcolor=VFD_WHITE)
               
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
+              
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
             elif name in ('mx','my','mz'):
               ll=Label(writer, y, x, writer.stringlen('-999.99'), bdcolor=False, align=align)
               ll.value('{:6.2f}'.format(-456.02), fgcolor=VFD_WHITE)
               
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'))
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
 
             elif name in ('state'):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
@@ -307,19 +314,19 @@ class Gui(object ):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               textline = '{:4.0f}'.format(self._dXY_jog if name in ('dXY') else self._dZ_jog)
               ll.value(textline, fgcolor=VFD_WHITE)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))              
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=0.1)              
             elif name in ('feed'):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               textline='{:4.0f}'.format(self._feedrateJog)
               ll.value(textline,fgcolor=fgcolor, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=10.0)
             elif name in ('cmd','icon'):
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=fgcolor, align=align)
               else:    
                 ll.value(name, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
             elif name in ('info','term'):
               print('info/term',name,textline, (y + nlines * writer.height + 2), (x + width + 2))
               if ((y + nlines * writer.height + 2) > 480) or ((x + width + 2) > 320):
@@ -328,14 +335,14 @@ class Gui(object ):
               ll=Textbox(writer, clip=False, row=y, col=x, width=width, nlines=nlines, bdcolor=False, fgcolor=fgcolor,bgcolor=VFD_BG)
               if textline.strip()!='':
                   ll.append(textline)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'))
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
             else: # etc
               ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               if textline.strip()!='':
                   ll.value(textline,fgcolor=fgcolor, align=align)
               else:    
                 ll.value(name,fgcolor=fgcolor, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
         return labels
 
 
@@ -473,7 +480,7 @@ class Gui(object ):
                        ,color=color)
 
 
-    def neoDisplayTemplate(self,params, template_name):
+    def neoDisplayTemplate(self, template_name):
       self.neoLabel('','info',hidden=True, force=True)
       templ_config=[]
       xx=0
@@ -481,17 +488,21 @@ class Gui(object ):
       ii=0
       xw=100
       yw=30
-      for param,val in params.items():
-          xx=(ii%3)*xw+10
+      rows=(len(self.grblParserObj.template.params)+PARAMS_IN_ROW-1)//PARAMS_IN_ROW
+      for param,val in self.grblParserObj.template.params.items():
+          xx=(ii%PARAMS_IN_ROW)*xw+10
           
-          yy=(ii//3)*yw+Y_POS_LABEL_PARAMS
+          yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS
           templ_config.append((template_name+'.'+param, '{0:.1f}'.format(val) , 'yellow'   ,  xx,  yy,  1, xw-10,1, ALIGN_RIGHT))
           ii+=1
+      for ii in range(rows+1) :
+         self.neo.line(10,Y_POS_LABEL_PARAMS+ii*yw-10,310,Y_POS_LABEL_PARAMS+ii*yw-10,VFD_GRAY)
+      for ii in range(PARAMS_IN_ROW-1) :
+         self.neo.line((ii+1)*xw+5,Y_POS_LABEL_PARAMS-15,(ii+1)*xw+5,Y_POS_LABEL_PARAMS+rows*yw-5,VFD_GRAY)
       #print('templ_config=',templ_config) 
       self.templ_labels=self.neoDrawAreas(templ_config)
       #print('templ_labels=',self.templ_labels)
       for ll in self.templ_labels:
-          print('templ_label ',ll)
           self.neoDraw(ll, labels=self.templ_labels)
       self.neo_refresh= True 
 
@@ -694,8 +705,8 @@ class Gui(object ):
         if id in labels:
               if not labels[id].invert:
                   labels[id].invert = True
-                  #self.labels[id].label.show()
-                  if id in ('x','y','z','dXY','dZ','feed') and self.rotaryObj[0]['axe']!=id:
+
+                  if  (id in ('x','y','z','dXY','dZ','feed') or id.find('.')>=0) and self.rotaryObj[0]['axe']!=id:
                     self.rotaryObj[0]['axe'] = id
                     if id in ('x','y','z'):
                       self.neoWorkCoordinate(id=id)
@@ -741,7 +752,7 @@ class Gui(object ):
                     self._highlightedArea=label
                     break
            if self._highlightedArea!='':
-              print('  pressed template ',self._highlightedArea)
+              print('  pressed template ',self._highlightedArea,self.rotaryObj[0]['axe'])
               self.neoHighLight(id=self._highlightedArea,labels=self.templ_labels)
            #else:
            #   self.neoPressedDrawPoint()   
@@ -830,12 +841,12 @@ class Gui(object ):
                   rotObj['mpos'] = self._current_template_idx
                   rotObj['rotary_on_mpos'] = value 
                   updated=True
-            # elif self._ui_modes[self._ui_mode] in ('feedJog'):
-            #     rotObj['mpos'] = self._feedrateJog
-            #     updated=True
-            # elif self._ui_modes[self._ui_mode] in ('feedRun'):
-            #     rotObj['mpos'] = self._feedrateRun
-            #     updated=True
+                elif rotObj['axe'].find('.') >=0:
+                   if self.grblParserObj.template.params is not None:
+                      param=rotObj['axe'][rotObj['axe'].find('.')+1:]
+                      if param in self.grblParserObj.template.params:
+                         rotObj['mpos'] = self.grblParserObj.template.params.get(param,0)
+                         rotObj['rotary_on_mpos'] = value 
             if not updated:
                continue    
              
@@ -1005,7 +1016,24 @@ class Gui(object ):
             #print('  new pos val, from',self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'],'self._current_template_idx',self._current_template_idx)
             #self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )
             self.neoDraw('term', labels=self.labels, currentLine=self._current_template_idx)
-            
+        elif self.rotaryObj[rotN]['axe'].find('.') >=0:
+          if self.grblParserObj.template.params is not None:
+            param=self.rotaryObj[rotN]['axe'][self.rotaryObj[rotN]['axe'].find('.')+1:]
+            if param in self.grblParserObj.template.params:
+               if self.rotaryObj[rotN]['axe'] in self.templ_labels:
+                  scale=self.templ_labels[self.rotaryObj[rotN]['axe']].rotaryScale
+               else:   
+                  scale=0.1
+                  print('     upd_rotary_on_template: not in labels ',param,self.rotaryObj[rotN]['axe'])
+
+                  
+               val=self.grblParserObj.template.params[param]+delta_val*scale
+               self.grblParserObj.template.params[param]=val
+               self.initRotaryStart() 
+               self.templ_labels[self.rotaryObj[rotN]['axe']].text=('{0:.2f}' if scale <0.1 else '{0:.1f}').format(val)
+               self.neoDraw(self.rotaryObj[rotN]['axe'], labels=self.templ_labels)
+                         
+
 
 
     # def upd_rotary_on_feedJog(self,rotN:int):
