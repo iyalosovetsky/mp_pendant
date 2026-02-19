@@ -285,7 +285,6 @@ class Gui(object ):
               ll.value('{:6.2f}'.format(val), fgcolor=fgcolor)
 
               rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
-              print('rotaryScale',rotaryScale,name,name2)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
             elif name in ('xyz'):
               # self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
@@ -574,11 +573,17 @@ class Gui(object ):
                  labels[id].label.goto(0)
 
 
-            else:   
-              if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
-                  labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
-              else:    
-                labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
+            else:
+              if id.find('.')>=0 :
+                if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
+                    labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
+                else:    
+                  labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
+              else:      
+                if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
+                    labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
+                else:    
+                  labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
             
             self.neo_refresh= True
 
