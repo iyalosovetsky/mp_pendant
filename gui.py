@@ -271,61 +271,35 @@ class Gui(object ):
             p=name.find('.')
 
             if p>=0:
-              #writerDt = CWriter(self.neo, fixed, verbose=self.debug)
-              #writerDt.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
-
+              
               name2=name[p+1:]
-              #print('neoDrawAreas:',name2, name, textline, fgcolor, x, y, scale, width, nlines,align)
-              #self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
-              flw=writer.stringlen('quadrant ')+2
-              fl=Label(writer, y, x, flw,fgcolor=VFD_GREEN)
-              fl.value((name2[:8]).upper()+' ',fgcolor=VFD_GREEN)
-              ll=Label(writer, y, x+flw, writer.stringlen('-9999.99'), bdcolor=False, align=align)
-              val=self.grblParserObj.template.params.get(name2,00.01)
-              ll.value('{:6.2f}'.format(val), fgcolor=fgcolor)
-
-              rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
-            elif name in ('xyz'):
-              # self.neo.rect(x+5,y+5,10,10,VFD_WHITE,True)
-              flw=writer.stringlen(name.upper()+': ')
-              fl=Label(writer, y, x, flw,fgcolor=fgcolor)
-              fl.value(name.upper()+': ',fgcolor=fgcolor)
-              ll=Label(writer, y, x+flw, writer.stringlen('-999.99'), bdcolor=False, align=align)
-              ll.value('{:6.2f}'.format(-123.01), fgcolor=VFD_WHITE)
-              
-              
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
-            elif name in ('mx','my','mz'):
-              ll=Label(writer, y, x, writer.stringlen('-999.99'), bdcolor=False, align=align)
-              ll.value('{:6.2f}'.format(-456.02), fgcolor=VFD_WHITE)
-              
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=VFD_WHITE , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
-
-            elif name in ('state'):
-              ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              if textline.strip()!='':
-                  ll.value(textline,fgcolor=fgcolor, align=align)
+              if name2 =='OK':
+                ll=Label(writer, y, x, textline, fgcolor=fgcolor, bdcolor=False, align=ALIGN_CENTER)
+                labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
               else:    
-                ll.value(name,fgcolor=fgcolor, align=align)
+                flw=writer.stringlen('quadrant ')+2
+                fl=Label(writer, y, x, (name2[:8]).upper()+' ',fgcolor=VFD_GREEN)
+                val=self.grblParserObj.template.params.get(name2,00.01)
+                ll=Label(writer, y, x+flw, '{:6.2f}'.format(val), bdcolor=False, fgcolor=fgcolor, align=align)
+                rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
+                labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
+            elif name in ('xyz'):
+              flw=writer.stringlen(name.upper()+': ')
+              fl=Label(writer, y, x, name.upper()+': ',fgcolor=VFD_RED if name=='x'  else VFD_GREEN if name=='y' else VFD_LBLUE)
+              ll=Label(writer, y, x+flw, '{:6.2f}'.format(0.0), fgcolor=fgcolor, bdcolor=False, align=align)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
+            elif name in ('mx','my','mz'):
+              ll=Label(writer, y, x,'{:6.2f}'.format(0.0), fgcolor=fgcolor, bdcolor=False, align=align)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
+            elif name in ('state','cmd','icon'):
+              ll=Label(writer, y, x, (textline if textline.strip()!='' else name),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('dXY','dZ'):
-              ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              textline = '{:4.0f}'.format(self._dXY_jog if name in ('dXY') else self._dZ_jog)
-              ll.value(textline, fgcolor=VFD_WHITE)
+              ll=Label(writer, y, x, '{:4.0f}'.format(self._dXY_jog if name in ('dXY') else self._dZ_jog),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=0.1)              
             elif name in ('feed'):
-              ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              textline='{:4.0f}'.format(self._feedrateJog)
-              ll.value(textline,fgcolor=fgcolor, align=align)
+              ll=Label(writer, y, x, '{:4.0f}'.format(self._feedrateJog),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=10.0)
-            elif name in ('cmd','icon'):
-              ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              if textline.strip()!='':
-                  ll.value(textline,fgcolor=fgcolor, align=align)
-              else:    
-                ll.value(name, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
             elif name in ('info','term'):
               print('info/term',name,textline, (y + nlines * writer.height + 2), (x + width + 2))
               if ((y + nlines * writer.height + 2) > 480) or ((x + width + 2) > 320):
@@ -487,13 +461,19 @@ class Gui(object ):
       ii=0
       xw=100
       yw=30
-      rows=(len(self.grblParserObj.template.params)+PARAMS_IN_ROW-1)//PARAMS_IN_ROW
+      rows=(len(self.grblParserObj.template.params)+1+PARAMS_IN_ROW-1)//PARAMS_IN_ROW
       for param,val in self.grblParserObj.template.params.items():
           xx=(ii%PARAMS_IN_ROW)*xw+10
           
           yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS
           templ_config.append((template_name+'.'+param, '{0:.1f}'.format(val) , 'yellow'   ,  xx,  yy,  1, xw-10,1, ALIGN_RIGHT))
           ii+=1
+      
+      xx=int((ii%PARAMS_IN_ROW)*(xw+0.4))
+          
+      yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS    
+      templ_config.append((template_name+'.OK', '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
+
       for ii in range(rows+1) :
          self.neo.line(10,Y_POS_LABEL_PARAMS+ii*yw-10,310,Y_POS_LABEL_PARAMS+ii*yw-10,VFD_GRAY)
       for ii in range(PARAMS_IN_ROW-1) :
@@ -673,7 +653,7 @@ class Gui(object ):
               if self.state.startswith('alarm'):
                   self._jog_arrow = ''
                   self.neoDisplayJog()
-                  self.neoIcon('Alarm\n^\nshft+6')
+                  self.neoIcon('Alarm')
                   self.neoLabel(self.state,id='state')
               elif self.state == 'run':    
                   self.neoLabel(self.state,id='state')

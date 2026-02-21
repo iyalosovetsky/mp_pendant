@@ -157,17 +157,12 @@ class GrblState(object):
     
 
     _parse_state_code:str='init'
-    #sendedQuery2grblCounter:int = 0
-    
+     
     _query4MPG_countDown:int = 10
-    # time2query:int = time.time_ns()
-    # MPG_time2query:int = time.time_ns()
-    # timeDelta2query:int = GRBL_QUERY_INTERVAL_IDLE
     _state_is_changed:bool = False
     _state_time_change:int = time.time_ns()
     _grblExecProgress:str = 'init'
-    # gotQuery:bool = False
-
+    
 
 
 
@@ -175,13 +170,6 @@ class GrblState(object):
     uartInNewData:int = -1
     bufferUartIn=[] #
     bufferUartInCounter=0
-    #bufferUartPos:int = 0
-    #bufferUartPrev:int = 0
- 
-
-    
-    # statetext:str = ''
-    # prev_statetext:str  = ''
     grblCmd2send=[]
     grblCmdHist=[]
     grblCmd2HistPos:int = 0
@@ -213,13 +201,6 @@ class GrblState(object):
         self.rt['parseUartBuffer'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_UART_GRBL_INTERVAL, 'proc': self.parseUartBuffer , 'last_error': 0}
         
         
-        # if st.need_query:
-    #     st.send2grblOne('?') # get status from grbl cnc machine    
-
-
-
-
-        #uarIn
         self.uart_grbl_mpg = uart_grbl_mpg
         
 
