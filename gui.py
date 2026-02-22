@@ -741,7 +741,9 @@ class Gui(object ):
               if '.OK' in self._highlightedArea:
                  print('  confirm template ',self._highlightedArea,self.rotaryObj[0]['axe'])
                  self._ui_confirm='OK'
-                 self.nextUiMode(0) # enter in confirm mode
+                 self.enterConfirmMode()
+                 self.neoIcon(text=self._ui_modes[self._ui_mode])
+                  # enter in confirm mode
               self.neoHighLight(id=self._highlightedArea,labels=self.templ_labels)
            #else:
            #   self.neoPressedDrawPoint()   

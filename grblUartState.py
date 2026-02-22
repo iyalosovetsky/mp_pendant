@@ -798,11 +798,34 @@ class GrblState(object):
         print('button_red_callback_long')
  
     def button_yellow_callback(self,pin,button):
-        print('button_yellow_callback')
+        print('button_yellow_callback',self.gui._ui_modes[self.gui._ui_mode],self.gui._ui_modes[self.gui._ui_mode_prev])
         
         if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
           self._ui_confirm='yes'
           self.gui._ui_mode= self.gui._ui_mode_prev
+          print('button_yellow_callback222: confirm mode, self._ui_confirm_prev=',self.gui._ui_modes[self.gui._ui_mode])
+          if self.gui._ui_modes[self.gui._ui_mode]=='template' and self.template is not None:
+            self.template.updateParams()
+            cmds=self.template.app.getGcode()
+            if isinstance(cmds,str):
+                  print('button_yellow_callback222: template mode, string mode template=',cmds)
+                  cmds=cmds.splitlines()
+            else:
+                  print('button_yellow_callback2222: template mode, list mode  template=',cmds)
+            newParams=self.template.params
+            print('button_yellow_callback2222: newParams=',newParams) 
+            ii=0
+            for cmd in cmds:
+                    #self.send2grbl(cmd) todo unmark after develop
+                    ii+=1
+                    #if ii==1:
+                    #   print('point11',cmd) 
+            print('len 2send2222',len(self.grblCmd2send),ii,self.template.params)
+            
+                
+
+
+
         else:
           if self.gui._ui_modes[self.gui._ui_mode] == 'drive' \
              and (self.grblParams._dX2go!=0 or self.grblParams._dY2go!=0 or self.grblParams._dZ2go!=0):
