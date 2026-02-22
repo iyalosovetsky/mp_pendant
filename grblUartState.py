@@ -84,7 +84,7 @@ MAX_UART_BUFFER_SIZE=20
 
 #GRBL_QUERY_INTERVAL = 0.5
 #GRBL_QUERY_INTERVAL_IDLE = 10
-GRBL_QUERY_INTERVAL_IDLE = 10000000000  # 10s in nanoseconds
+GRBL_QUERY_INTERVAL_IDLE = 10_000_000_000  # 10s in nanoseconds
 GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MPG_INTERVAL = 500000000  # 0.5s in nanoseconds
 ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
@@ -100,20 +100,23 @@ MAX_BUFFER_SIZE = 200
 
 objgrblState=None
 rx_buffer = b''
+uart_is_live = False
 
 
 def uart_callback(uart_object):
     global objgrblState
     global rx_buffer
+    global uart_is_live
     # Read all available bytes from the UART buffer
     # It's better to use uart.read() without an argument to get all data at once
     # or iterate until uart.any() is 0.
     while uart_object.any() > 0:
         byte_data = uart_object.read(1) # Read a single byte
-        
+        #print(f"uart_callback: byte_data={byte_data}, rx_buffer={rx_buffer}")
         if byte_data is not None:
             #print(f"Received byte (bytes object): {byte_data}, Integer value: {byte_value}, Character: {chr(byte_value)}")
             if (byte_data[0] == 10 or  byte_data[0]==13 or len(rx_buffer)> MAX_BUFFER_SIZE):  # Newline or carriage return or buffer full):
+              uart_is_live = True
               if len(rx_buffer)>0:  
                   if objgrblState is not None:
                     try:  
@@ -159,6 +162,9 @@ class GrblState(object):
     _parse_state_code:str='init'
      
     _query4MPG_countDown:int = 10
+    _queries:int = 0
+    _queries_on_mpg:int = 0 
+    
     _state_is_changed:bool = False
     _state_time_change:int = time.time_ns()
     _grblExecProgress:str = 'init'
@@ -308,13 +314,18 @@ class GrblState(object):
           self.p_RTSetDisabled(id='autoQuery2grbl',value=False)       
     
     def toggleMPG(self):
+        print('toggleMPG',self._query4MPG_countDown)
         self.gui.neoLabel("#",id='cmd')
         #self.uart_grbl_mpg.write(bytearray(b'\x8b\r\n'))
         self.uart_grbl_mpg.write(bytearray(b'\x8b'))
         self.query_now('toggleMPG')
 
+    #task to query MPG state and update self.grblParams._mpg accordingly. It is called periodically by real time scheduler and also after sending MPG toggle command to grbl. It uses self._query4MPG_countDown to limit number of queries after MPG toggle command, because some grbl versions send multiple status reports with wrong MPG state after toggle command.
     def query4MPG(self):
-        if (self.grblParams._mpg is None or self.grblParams._mpg==0) and self._query4MPG_countDown>0 :
+        #print('in query4MPG',self._query4MPG_countDown,self._queries,self._queries_on_mpg, self.grblParams._mpg)
+        if (self.grblParams._mpg is None or self.grblParams._mpg==0) and self._query4MPG_countDown>0 and self._queries>self._queries_on_mpg:
+           #print('in query4MPG[2]',self._query4MPG_countDown)
+           self._queries_on_mpg= self._queries
            self._query4MPG_countDown -= 1
            self.toggleMPG()
            
@@ -326,6 +337,7 @@ class GrblState(object):
       if DEBUG or (command is not None and command!='' and not command.startswith('?')) :
         print('send2grblOne:',command,len(command))
       if command in ('~','!','?'):
+        self._queries+=  1
         #self.flashKbdLEDs(LED_ALL , BLINK_2) ##7 - 3 leds       # 1 - macro1
         self.mpgCommand(command)
         if command !='?':
@@ -465,14 +477,11 @@ class GrblState(object):
           self.send2grblOne(l_cmd)
 
     def autoQuery2grbl(self):
-        # self.gotQuery=True
         self.send2grblOne('?') # get status from grbl cnc machine          
 
     def query_now(self, parent):
         if self.debug:
             print('query_now',parent)
-        #self._need_query = True    
-        # self.gotQuery = False
         self.p_RTSetRunNow('autoQuery2grbl')
 
 
@@ -530,7 +539,7 @@ class GrblState(object):
         lineStateIn=lineStateIn.strip()
            
 
-
+        #print('lineStateIn IN ',lineStateIn)  
         #print('grblState IN ',grblState,']]]]]]]]]]]]]',grblState.find('error:'))  
         #grblState=grblState.replace('ok','').replace('\n','').replace('\r','')
         self._parse_state_code='parse'
@@ -569,10 +578,12 @@ class GrblState(object):
                 else:
                     elem = token.split(':')
                     if len(elem)>1 and elem[0]=='mpg' and elem[1] is not None and (elem[1]=='1' or elem[1]=='0'):
+                        print('elem mpg',elem)
                         self.grblParams._mpg_prev=self.grblParams._mpg
                         self.grblParams._mpg=(elem[1]=='1')
                         self.gui.labels['info'].color=VFD_LBLUE if self.grblParams._mpg  else VFD_WHITE
                         if self.grblParams._mpg==1:
+                            print('MPG reached')
                             self._query4MPG_countDown = 0
                         
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       

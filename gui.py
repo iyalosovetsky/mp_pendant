@@ -170,17 +170,17 @@ class Gui(object ):
             ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
             ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
             ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
-            ('mx', '     '       , X_ARROW_COLOR   ,  150+67,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
-            ('my', '     '       , Y_ARROW_COLOR   ,  150+67, 115+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('mz', '     '       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('dXY', 'dXY'        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
-            ('dZ', 'dZ'          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
+            ('mx', '{:6.2f}'.format(0.0)       , X_ARROW_COLOR   ,  150+67,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
+            ('my', '{:6.2f}'.format(0.0)       , Y_ARROW_COLOR   ,  150+67, 115+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('mz', '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('dXY', '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
+            ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
             ('cmd', '     '      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
-            ('feed', '1000'    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
+            ('feed', '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
             ('state', 'Idle MPG G59'    , 'white'         ,  6*20,  0,  2, 310-120,1, ALIGN_LEFT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
             ('<', '<< '           ,  'yellow'       ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
-            ('icon', 'main' , ICON_COLOR, 20+3*14,  405, 2, 250-20-3*14    ,1, ALIGN_CENTER),
+            ('icon', '     main     ' , ICON_COLOR, 20+3*14,  405, 2, 250-20-3*14    ,1, ALIGN_CENTER),
             ('>', ' >>'           ,  'lblue'        ,  250, 400,  3, 60     ,1, ALIGN_LEFT),
             ('info', 'info'      , 'white'         ,    0, 280,  2, 306    ,4, ALIGN_LEFT)  #6*51
         ]
@@ -286,19 +286,19 @@ class Gui(object ):
             elif name in ('xyz'):
               flw=writer.stringlen(name.upper()+': ')
               fl=Label(writer, y, x, name.upper()+': ',fgcolor=VFD_RED if name=='x'  else VFD_GREEN if name=='y' else VFD_LBLUE)
-              ll=Label(writer, y, x+flw, '{:6.2f}'.format(0.0), fgcolor=fgcolor, bdcolor=False, align=align)
+              ll=Label(writer, y, x+flw, '{:6.2f}'.format(-230.1), fgcolor=fgcolor, bdcolor=False, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
             elif name in ('mx','my','mz'):
-              ll=Label(writer, y, x,'{:6.2f}'.format(0.0), fgcolor=fgcolor, bdcolor=False, align=align)
+              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
             elif name in ('state','cmd','icon'):
               ll=Label(writer, y, x, (textline if textline.strip()!='' else name),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
             elif name in ('dXY','dZ'):
-              ll=Label(writer, y, x, '{:4.0f}'.format(self._dXY_jog if name in ('dXY') else self._dZ_jog),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
+              ll=Label(writer, y, x, textline,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=0.1)              
             elif name in ('feed'):
-              ll=Label(writer, y, x, '{:4.0f}'.format(self._feedrateJog),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
+              ll=Label(writer, y, x,textline ,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=10.0)
             elif name in ('info','term'):
               print('info/term',name,textline, (y + nlines * writer.height + 2), (x + width + 2))
@@ -738,6 +738,10 @@ class Gui(object ):
                     break
            if self._highlightedArea!='':
               print('  pressed template ',self._highlightedArea,self.rotaryObj[0]['axe'])
+              if '.OK' in self._highlightedArea:
+                 print('  confirm template ',self._highlightedArea,self.rotaryObj[0]['axe'])
+                 self._ui_confirm='OK'
+                 self.nextUiMode(0) # enter in confirm mode
               self.neoHighLight(id=self._highlightedArea,labels=self.templ_labels)
            #else:
            #   self.neoPressedDrawPoint()   
