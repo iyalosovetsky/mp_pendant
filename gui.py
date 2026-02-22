@@ -750,46 +750,53 @@ class Gui(object ):
         if self._highlightedArea=='' and self.debug:
             self.neoPressedDrawPoint()
 
+    def refreshUiMode(self):
+      self._ui_confirm='unkn'
+      if self._ui_modes[self._ui_mode] in ('main','drive'):
+        self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
+        self.rotaryObj[0]['axe']='x'
+        self.neoIcon(text=self._ui_modes[self._ui_mode])
+        self.grblParams._dX2go=0.0
+        self.grblParams._dY2go=0.0
+        self.grblParams._dZ2go=0.0
+        self.initRotaryStart()
+        self.showFeed()
+        # self.labels['dXY'].fgcolor=VFD_WHITE
+        # self.labels['dZ'].fgcolor=VFD_WHITE
 
-    def nextUiMode(self, direction):
-        self._ui_mode+=direction
-        if direction==0: # enter in confirm mode
+        self.show_dXY()
+        self.show_dZ()
+        self.show_coordinates()
+        self.neoHighLight(id='x',labels=self.labels) # default highlight x coordinate in main and drive modes
+      elif self._ui_modes[self._ui_mode] in ('template'):
+        self.neoIcon(text=self._ui_modes[self._ui_mode])
+        self.rotaryObj[0]['axe']='term'
+        self.initRotaryStart()
+        self.neoHighLight(id='term',labels=self.labels)
+        self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
+        self.neoLabel('','info',hidden=True, force=True)
+      
+
+    def nextUiMode(self, direction=None):
+        oldUiMode=self._ui_mode
+        if direction is not None :
+          self._ui_mode+=direction
+        if direction is None: # enter in confirm mode
           self._ui_mode_prev=self._ui_mode
           self._ui_mode = len(self._ui_modes)-1 # 'confirm' mode, last element    
         elif self._ui_mode<0:
           self._ui_mode=len(self._ui_modes)-2
         elif self._ui_mode>=len(self._ui_modes)-1 or self._ui_modes[self._ui_mode]=='confirm':
           self._ui_mode=0
+        if oldUiMode!=self._ui_mode:  
+          self.refreshUiMode()
 
-        self._ui_confirm='unkn'
-        if self._ui_modes[self._ui_mode] in ('main','drive'):
-          self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
-          self.rotaryObj[0]['axe']='x'
-          self.neoIcon(text=self._ui_modes[self._ui_mode])
-          self.grblParams._dX2go=0.0
-          self.grblParams._dY2go=0.0
-          self.grblParams._dZ2go=0.0
-          self.initRotaryStart()
-          self.showFeed()
-          # self.labels['dXY'].fgcolor=VFD_WHITE
-          # self.labels['dZ'].fgcolor=VFD_WHITE
-
-          self.show_dXY()
-          self.show_dZ()
-          self.show_coordinates()
-          self.neoHighLight(id='x',labels=self.labels) # default highlight x coordinate in main and drive modes
-        elif self._ui_modes[self._ui_mode] in ('template'):
-          self.neoIcon(text=self._ui_modes[self._ui_mode])
-          self.rotaryObj[0]['axe']='term'
-          self.initRotaryStart()
-          self.neoHighLight(id='term',labels=self.labels)
-          self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
-          self.neoLabel('','info',hidden=True, force=True)
+        
 
 
 
     def enterConfirmMode(self):
-       self.nextUiMode(0)
+       self.nextUiMode(direction=None) # enter in confirm mode
 
 
     def getConfirm(self):
