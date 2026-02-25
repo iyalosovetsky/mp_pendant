@@ -75,6 +75,13 @@ class Template:
         #print('Template.setParams: found params',self.params)            
              
 
+    def updateParams(self):
+        if loaded_app is None:
+            return
+        print('Template.updateParams: update params with ',self.params)
+        loaded_app.setParams(self.params)
+
+
     def getGcode(self):
         if self.app is None:
             return None

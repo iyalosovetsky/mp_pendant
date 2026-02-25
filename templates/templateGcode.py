@@ -52,3 +52,12 @@ class TemplateGcode():
             cmd.extend(cmdOne)
         cmd.extend(self.getEndGcode())    
         return cmd
+    
+    def setParams(self, parameters:dict):
+        print('in setParams TemplateGcode',parameters)
+        for key, value in parameters.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+                print(f"info: Parameter '{key}'  found in TemplateGcode")
+            else:
+                print(f"Warning: Parameter '{key}' not found in TemplateGcode")
