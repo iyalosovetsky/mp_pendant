@@ -74,6 +74,8 @@ NOBLINK = 4
 
 DEBUG= False
 MAX_UART_BUFFER_SIZE=20
+MAX_BUTTON_BUFFER_SIZE=20
+
 
 
 
@@ -91,7 +93,7 @@ ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
 POP_CMD_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 POP_UART_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 RUN_NOW_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
-
+POP_BUTTON_INTERVAL=  300000000 # 0.3s in nanoseconds for pop cmd to grbl
 
 
 MAX_BUFFER_SIZE = 200
@@ -179,6 +181,8 @@ class GrblState(object):
     grblCmd2send=[]
     grblCmdHist=[]
     grblCmd2HistPos:int = 0
+    grblButtonHist=[]
+    buttonInCounter=0
 
 
 
@@ -205,6 +209,7 @@ class GrblState(object):
         self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
         self.rt['autoQuery2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': GRBL_QUERY_INTERVAL_IDLE, 'proc': self.autoQuery2grbl , 'last_error': 0}
         self.rt['parseUartBuffer'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_UART_GRBL_INTERVAL, 'proc': self.parseUartBuffer , 'last_error': 0}
+        self.rt['popButtons'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_BUTTON_INTERVAL, 'proc': self.popButtons , 'last_error': 0}
         
         
         self.uart_grbl_mpg = uart_grbl_mpg
@@ -328,6 +333,7 @@ class GrblState(object):
            self._queries_on_mpg= self._queries
            self._query4MPG_countDown -= 1
            self.toggleMPG()
+           return 0
            
 
     
@@ -463,6 +469,7 @@ class GrblState(object):
       if self._grblExecProgress!='do':
           self.popCmd2grbl()
 
+    #task
     def popCmd2grbl(self):
       if len(self.grblCmd2send)>0:
         l_cmd=self.grblCmd2send[0]
@@ -471,13 +478,18 @@ class GrblState(object):
           l_cmd=='-x' or l_cmd=='+x' or 
           l_cmd=='-z' or l_cmd=='+z' ):
           print('popCmd2grbl: busy', self._grblExecProgress, l_cmd )
-          return
+          return 1
         else:
           l_cmd=self.grblCmd2send.pop(0)
           self.send2grblOne(l_cmd)
+          return 0
+      else: 
+         return 2    
 
+    #task
     def autoQuery2grbl(self):
         self.send2grblOne('?') # get status from grbl cnc machine          
+        return 0
 
     def query_now(self, parent):
         if self.debug:
@@ -685,12 +697,13 @@ class GrblState(object):
             
             
 
-
+    #task
     def parseUartBuffer(self):
        while len(self.bufferUartIn)>0:        
           self.last_uart_mess=self.bufferUartIn.pop(0)
           self.parseState(self.last_uart_mess[1])
           self.gui.displayState()
+          return 0
 
 
 
@@ -771,95 +784,136 @@ class GrblState(object):
     def upd_rotary(self):
         if self._grblExecProgress in ('do','doing','alarm','error'):
             #print ('upd_rotary: scip on _grblExecProgress=',self._grblExecProgress)
-            return
+            return 1
         if self._mPosInited :
           self.gui.upd_rotary()
+        return 0 
  
 
 
 
     def button_red_callback(self,pin,button): # right key
-        print('button_red_callback  self._grblExecProgress=', self._grblExecProgress, self.grblParams._state)
-        if self._grblExecProgress in ('do','doing','alarm','error') or self.grblParams._state in ('alarm','error') :
-          self.send2grblOne('cancel')
-          self.send2grblOne('^')
-          #machine.soft_reset()
-          
-        else:  
-          if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
-            self._ui_confirm='no'
-            self.gui._ui_mode= self.gui._ui_mode_prev
-          else:
-            self.gui.nextUiMode(1) 
+       self.pushButtons(btnN=1,state=1)
+
            
              
 
     def button_red_callback_long(self,pin,button):
-        print('button_red_callback_long')
+        self.pushButtons(btnN=1,state=2)
+        
  
     def button_yellow_callback(self,pin,button):
-        print('button_yellow_callback')
-        
-        if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
-          self._ui_confirm='yes'
-          self.gui._ui_mode= self.gui._ui_mode_prev
-        else:
-          if self.gui._ui_modes[self.gui._ui_mode] == 'drive' \
-             and (self.grblParams._dX2go!=0 or self.grblParams._dY2go!=0 or self.grblParams._dZ2go!=0):
-             cmd='G91 G1'
-             if self.grblParams._dX2go!=0:
-               cmd+=' X{0:.3f}'.format(self.grblParams._dX2go)
-             if self.grblParams._dY2go!=0:
-               cmd+=' Y{0:.3f}'.format(self.grblParams._dY2go)
-             if self.grblParams._dZ2go!=0:
-               cmd+=' Z{0:.3f}'.format(self.grblParams._dZ2go)
-             if self.gui._feedrateRun>0:
-               cmd+=' F{0:.0f}'.format(self.gui._feedrateRun)
-             else:
-               cmd+=' F{0:.0f}'.format(50)  
-             
-             self.mpgCommandShow(cmd)
-             self.grblParams._dX2go=0.00
-             self.grblParams._dY2go=0.00
-             self.grblParams._dZ2go=0.00
-          elif self.gui._ui_modes[self.gui._ui_mode] == 'template':
-             print('button_yellow_callback: template mode, ',self.gui._current_template_idx)
-             if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
-                self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
-             if self.template is not None and self.template.app is not None :  
-                
-                ii=0
-                cmds=self.template.app.getGcode()
-                if isinstance(cmds,str):
-                  print('button_yellow_callback: template mode, string mode template=',cmds)
-                  cmds=cmds.splitlines()
-                else:
-                  print('button_yellow_callback: template mode, list mode  template=',cmds)
-
-
-
-
-
-                for cmd in cmds:
-                    #self.send2grbl(cmd) todo unmark after develop
-                    ii+=1
-                    #if ii==1:
-                    #   print('point11',cmd) 
-                print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
-                self.gui.neoDisplayTemplate(template_name =self.template.template_name)
-
-
-
-
-          else:  
-              self.gui.nextUiMode(-1) 
+        self.pushButtons(btnN=0,state=1)
 
 
     def button_yellow_callback_long(self,pin ,button):
-        print('button_yellow_callback_long')
-        if self._grblExecProgress in ('do','doing','alarm','error'):
-            print ('button_yellow_callback_long: skip on _grblExecProgress=',self._grblExecProgress)
-            return        
-        if self.gui._ui_modes[self.gui._ui_mode] in ( 'main'):
-          if self.gui.rotaryObj[0]['axe'] in ('x','y','z'):
-            self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
+        self.pushButtons(btnN=0,state=2)
+
+    # def button2_YR_callback_long(self,pin ,button):
+    #    print('button2_YR_callback_long: red and  yellow together press long')
+
+    # def button2_YR_callback(self,pin ,button):
+    #    print('button2_YR_callback: red and  yellow together pressed short')
+
+
+    def pushButtons(self,btnN,state):
+       while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
+          self.grblButtonHist.pop(0)
+       self.grblButtonHist.append([self.buttonInCounter,btnN,state])     
+
+    # task buttons
+    def popButtons(self):
+        if len(self.grblButtonHist)>0:
+          l_buttonEvent=self.grblButtonHist.pop(0)       
+          if l_buttonEvent[1]==0: #yellow
+            if l_buttonEvent[2]==2: #long
+              print('button_yellow_callback_long')
+              if self._grblExecProgress in ('do','doing','alarm','error'):
+                  print ('button_yellow_callback_long: skip on _grblExecProgress=',self._grblExecProgress)
+                  return 1       
+              if self.gui._ui_modes[self.gui._ui_mode] in ( 'main'):
+                if self.gui.rotaryObj[0]['axe'] in ('x','y','z'):
+                  self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
+                  return 0
+            elif l_buttonEvent[2]==1: #normal
+              print('button_yellow_callback')
+              if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
+                self._ui_confirm='yes'
+                self.gui._ui_mode= self.gui._ui_mode_prev
+                return 0
+              else:
+                if self.gui._ui_modes[self.gui._ui_mode] == 'drive' \
+                  and (self.grblParams._dX2go!=0 or self.grblParams._dY2go!=0 or self.grblParams._dZ2go!=0):
+                  cmd='G91 G1'
+                  if self.grblParams._dX2go!=0:
+                    cmd+=' X{0:.3f}'.format(self.grblParams._dX2go)
+                  if self.grblParams._dY2go!=0:
+                    cmd+=' Y{0:.3f}'.format(self.grblParams._dY2go)
+                  if self.grblParams._dZ2go!=0:
+                    cmd+=' Z{0:.3f}'.format(self.grblParams._dZ2go)
+                  if self.gui._feedrateRun>0:
+                    cmd+=' F{0:.0f}'.format(self.gui._feedrateRun)
+                  else:
+                    cmd+=' F{0:.0f}'.format(50)  
+                  
+                  self.mpgCommandShow(cmd)
+                  self.grblParams._dX2go=0.00
+                  self.grblParams._dY2go=0.00
+                  self.grblParams._dZ2go=0.00
+                  return 0
+                elif self.gui._ui_modes[self.gui._ui_mode] == 'template':
+                  print('button_yellow_callback: template mode, ',self.gui._current_template_idx)
+                  if self.gui._current_template_idx is not None and self.gui._current_template_idx>=0 and self.gui._current_template_idx<len(self.gui.templ_files):
+                      self.template=Template(template_name=self.gui.templ_files[self.gui._current_template_idx])
+                  if self.template is not None and self.template.app is not None :  
+                      
+                      ii=0
+                      cmds=self.template.app.getGcode()
+                      if isinstance(cmds,str):
+                        print('button_yellow_callback: template mode, string mode template=',cmds)
+                        cmds=cmds.splitlines()
+                      else:
+                        print('button_yellow_callback: template mode, list mode  template=',cmds)
+
+
+
+
+
+                      for cmd in cmds:
+                          #self.send2grbl(cmd) todo unmark after develop
+                          ii+=1
+                          #if ii==1:
+                          #   print('point11',cmd) 
+                      print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
+                      self.gui.neoDisplayTemplate(template_name =self.template.template_name)
+                      return 0
+
+
+
+
+                else:  
+                    self.gui.nextUiMode(-1)
+                    return 0 
+            
+          elif l_buttonEvent[1]==1: #red
+            if l_buttonEvent[2]==2: #long
+              print('button_red_callback_long')
+              return 0
+            elif l_buttonEvent[2]==1: #normal
+              print('button_red_callback  self._grblExecProgress=', self._grblExecProgress, self.grblParams._state)
+              if self._grblExecProgress in ('do','doing','alarm','error') or self.grblParams._state in ('alarm','error') :
+                self.send2grblOne('cancel')
+                self.send2grblOne('^')
+                #machine.soft_reset()
+                return 0
+              else:  
+                if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
+                  self._ui_confirm='no'
+                  self.gui._ui_mode= self.gui._ui_mode_prev
+                else:
+                  self.gui.nextUiMode(1)                
+                return 0  
+          return 0  
+
+             
+
