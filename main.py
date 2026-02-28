@@ -6,8 +6,8 @@ import sys
 from nanoguilib.color_setup import ssd
 from nanoguilib.nanogui import refresh
 from TermReader import TermReader
-from ns2009 import Touch
-from button import Button
+#from ns2009 import Touch
+#from button import Button
 
 
 
@@ -52,8 +52,6 @@ refresh(ssd, True)
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False, templateDir='/templates')
 st.gui.set_rotary_obj(rot0,0,'x',1.0)
-#st.gui.set_redButton(16)
-#st.gui.set_yellowButton(17)
 st.gui.set_redButton(17)
 st.gui.set_yellowButton(16)
 
@@ -63,14 +61,14 @@ rot0.add_listener(st.rotary_listener0)
     
 kbd.objGrblStateSetter(st)
 
-refresh(ssd)
+#refresh(ssd)
 
 
 term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
-ns = Touch(isLandscape=False)
-ns.set_int_handler(st.gui.touchscreen_press)
+#ns = Touch(isLandscape=False)
+#ns.set_int_handler(st.gui.touchscreen_press)
 print('touch initialized')
 
 #p_yellow=Pin(17, Pin.IN, Pin.PULL_UP)

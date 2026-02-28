@@ -601,15 +601,8 @@ class GrblState(object):
             
         
         
-        
-           
-
-        #print('lineStateIn IN ',lineStateIn)  
-        #print('grblState IN ',grblState,']]]]]]]]]]]]]',grblState.find('error:'))  
-        #grblState=grblState.replace('ok','').replace('\n','').replace('\r','')
         self._parse_state_code='parse'
         if lineStateIn.startswith('ok'):
-          print('OKKor',lineStateIn,']]]]]]]]]]]]]','prev:', self._grblExecProgress)  
           if self._grblExecProgress=='do':
              self._grblExecProgress='doing'
           elif self._grblExecProgress=='doing':

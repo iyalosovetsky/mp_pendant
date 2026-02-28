@@ -408,8 +408,20 @@ class Gui(object ):
              self.labels[id].fgcolor=VFD_RED
         elif id=='feed' and (text.lower().startswith('run') or text.lower().startswith('jog')):
              self.labels[id].fgcolor=VFD_GREEN
-        elif id=='info' and  self.grblParams._mpg=='1':
+#        elif id=='info' and  self.grblParams._mpg=='1':
+#             self.labels[id].fgcolor=VFD_LBLUE
+        elif id=='info' and  text.find('Alarm')>=0:
+             self.labels[id].fgcolor=VFD_RED
+        elif id=='info' and  text.find('Jog')>=0:
+             self.labels[id].fgcolor=VFD_GREEN
+        elif id=='info' and  text.find('Run')>=0:
+             self.labels[id].fgcolor=VFD_YELLOW
+        elif id=='info' and  text.find('Hold')>=0:
+             self.labels[id].fgcolor=VFD_GRAY
+        elif id=='info' and self.grblParams._mpg=='1':
              self.labels[id].fgcolor=VFD_LBLUE
+        elif id=='info' and self.grblParams._mpg!='1':
+             self.labels[id].fgcolor=VFD_WHITE
         elif id=='mpg' and  self.grblParams._mpg=='1':
              self.labels[id].fgcolor=VFD_GREEN
         elif color is not None:
@@ -605,23 +617,27 @@ class Gui(object ):
                 labels[id].label.bdcolor=False  
               labels[id].label.clear()
               labels[id].label.fgcolor=labels[id].fgcolor
-              labels[id].label.append(labels[id].text[ : labels[id].chars])
+              #labels[id].label.append(labels[id].text[ : labels[id].chars])
+              pos=0
+              if currentLine is not None and currentLine>=labels[id].label.nlines and len(labels[id].text.splitlines())>labels[id].label.nlines:
+                 pos=currentLine+1-labels[id].label.nlines
+              labels[id].label.append(labels[id].text,ntrim=100,line=pos)
               labels[id].label.invertNLine=currentLine
-              if currentLine is not None and labels[id].label.nlines>currentLine:
-                 labels[id].label.goto(currentLine)
-              else:
-                 labels[id].label.goto(0)
+              labels[id].label.show()
+
+                 
+
 
 
             else:
               if id.find('.')>=0 :
                 if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
-                    labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
+                  labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
                 else:    
                   labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
               else:      
                 if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
-                    labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
+                  labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
                 else:    
                   labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
             
@@ -695,7 +711,8 @@ class Gui(object ):
       self.grblParserObj._cnc_params_need_show = False
       if len(self.grblParserObj._cnc_params)>0:
         self._current_template_idx=0
-        textline='\n'.join([ff[0][1:]+':'+ff[1] for ff in self.grblParserObj._cnc_params])
+        textline='\n'.join([(ff[0][1:]+':'+ff[1])[:10] for ff in self.grblParserObj._cnc_params])
+        print('show_params:',len(self.grblParserObj._cnc_params))
         self.neoTerm(textline,currentLine=self._current_template_idx   )  
 
 
@@ -807,7 +824,6 @@ class Gui(object ):
              self.neoHighLight(id='term',labels=self.labels)
              self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
           elif self._highlightedArea in ('term') and self._ui_modes[self._ui_mode] in ('main','drive')  :   
-             print('point1 ',self._highlightedArea)
              self.neoHighLight(id='term',labels=self.labels)
              self.grblParserObj.queryParams()
              
@@ -1025,7 +1041,6 @@ class Gui(object ):
         delta_val = self.rotaryObj[rotN]['obj'].value() - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
             return
-        print('upd_rotary_on_term 3') 
         if self._ui_modes[self._ui_mode] == 'template': 
           self.termShiftPos(rotN, delta_val, self.templ_files)
         else:    
@@ -1076,9 +1091,18 @@ class Gui(object ):
 
     def termShiftPos(self,rotN, delta_val, lst):
         self.initRotaryStart()  
+
         if self._current_template_idx is None or len(lst)<1:
             return
-        index = self._current_template_idx + (1 if delta_val>0 else -1)
+        scale=1
+        if abs(delta_val)>100:
+           scale=10
+        elif abs(delta_val)>50:
+           scale=5
+        elif abs(delta_val)>10:  
+           scale=2
+
+        index = self._current_template_idx + (scale if delta_val>0 else -scale)
         if index > len(lst)-1:
             self._current_template_idx=len(lst)-1
         elif index<0:
@@ -1439,7 +1463,6 @@ class Gui(object ):
             if self.rotaryObj[rotN]['obj'] is not None  :
                 if self.rotaryObj[rotN]['updated'] and \
                   (self._ui_modes[self._ui_mode] == 'drive' or self._ui_modes[self._ui_mode] == 'template' or self.rotaryObj[rotN]['axe'] in ('icon','term') or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
-                  print ('upd_rotary: every 1s[1], updated rotN=',self.rotaryObj[rotN]['axe'])
                   continue
                 
 
