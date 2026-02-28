@@ -1,4 +1,4 @@
-from machine import UART, Pin
+from machine import UART
 import machine
 import time
 import sys
@@ -52,6 +52,11 @@ refresh(ssd, True)
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False, templateDir='/templates')
 st.gui.set_rotary_obj(rot0,0,'x',1.0)
+#st.gui.set_redButton(16)
+#st.gui.set_yellowButton(17)
+st.gui.set_redButton(17)
+st.gui.set_yellowButton(16)
+
 rot0.add_listener(st.rotary_listener0)
 
 
@@ -68,10 +73,10 @@ ns = Touch(isLandscape=False)
 ns.set_int_handler(st.gui.touchscreen_press)
 print('touch initialized')
 
-p_yellow=Pin(17, Pin.IN, Pin.PULL_UP)
-p_red=Pin(16, Pin.IN, Pin.PULL_UP)
-bt_red=Button(pin=p_yellow,callback=st.button_red_callback,callback_long=st.button_red_callback_long)
-bt_yellow=Button(pin=p_red,callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long, pin2=p_yellow, callback2=st.button2_YR_callback,callback2_long=st.button2_YR_callback_long)
+#p_yellow=Pin(17, Pin.IN, Pin.PULL_UP)
+#p_red=Pin(16, Pin.IN, Pin.PULL_UP)
+#bt_red=Button(pin=p_yellow,callback=st.button_red_callback,callback_long=st.button_red_callback_long)
+#bt_yellow=Button(pin=p_red,callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
 
  
 
@@ -81,9 +86,7 @@ while True:
     st.p_RTLoop()
   
         
-    if st.gui.neo_refresh:
-        st.gui.neo_refresh=False
-        refresh(ssd)##
+    
         
     proceedCh = term_reader.read()
     if proceedCh is not None and len(proceedCh)>0:

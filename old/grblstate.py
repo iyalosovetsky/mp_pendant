@@ -902,8 +902,8 @@ class GrblState(object):
         if self._jog_arrow=='':
            self.neoIcon(text='MPG  ' if self._mpg else 'nompg')
         else:
-          self.neoIcon(text=('>>>' if self._jog_arrow.startswith('+') else '<<<') +
-                       '\n'+('d={0:.1f}'.format(self._dZ) if self._jog_arrow.endswith('z') else 'd={0:.1f}'.format(self._dXY))+
+          self.neoIcon(text=('>>>' if self._jog_arrow.startswith('+') else '<<<') + \
+                       '\n'+('d={0:.1f}'.format(self._dZ) if self._jog_arrow.endswith('z') else 'd={0:.1f}'.format(self._dXY))
                        ,color=color)   
 
 

@@ -11,6 +11,10 @@ import nanoguilib.arial10 as arial10
 import nanoguilib.courier20 as fixed
 import nanoguilib.arial35 as arial35
 import os
+from nanoguilib.nanogui import refresh
+from machine import  Pin
+from button import Button
+from ns2009 import Touch
 
 
 Y_POS_LABEL_PARAMS=280
@@ -71,6 +75,7 @@ FEED_RUN_STEPS=[10.,100.,200.,500.,1000.]
 
 PENDANT_READ_INTERVAL =  300000000 # 0.3s in nanoseconds for pop cmd to grbl
 GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
+MAX_BUTTON_BUFFER_SIZE=20
 
 DEBUG= False
 
@@ -161,12 +166,26 @@ class Gui(object ):
 
     neo_refresh:bool = False
 
+    pin_yellow=None
+    button_yellow=None
+    pin_red=None
+    button_red=None
+    ns=None
+
+    grblButtonHist=[]
+    buttonInCounter=0
+
+    def set_yellowButton(self,pin:int):
+       self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
+       self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
+
     debug:bool = DEBUG
     enable_invert_on_select = True
     templ_files = []
     labels = {}  # dictionary of configured messages_labels
     templ_labels = {}  # dictionary to store params of template macro
-    _msg_conf = [
+    _msg_conf = [ #name, textline, fgcolor, x, y, scale, width, nlines,align
+            ('info', 'info'      , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
             ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
             ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
             ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
@@ -175,14 +194,15 @@ class Gui(object ):
             ('mz', '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
             ('dXY', '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
             ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
-            ('cmd', '     '      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
+            ('cmd', '#G29 some command grbl'      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
             ('feed', '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
-            ('state', 'Idle MPG G59'    , 'white'         ,  6*20,  0,  2, 310-120,1, ALIGN_LEFT),
+            ('state', 'Initial'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
+            ('mpg', 'noMPG G57'    , 'white'         ,  220,  0,  2, 310-120,1, ALIGN_RIGHT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
-            ('<', '<< '           ,  'yellow'       ,   10, 400,  3, 60     ,1, ALIGN_LEFT),
-            ('icon', '     main     ' , ICON_COLOR, 20+3*14,  405, 2, 250-20-3*14    ,1, ALIGN_CENTER),
-            ('>', ' >>'           ,  'lblue'        ,  250, 400,  3, 60     ,1, ALIGN_LEFT),
-            ('info', 'info'      , 'white'         ,    0, 280,  2, 306    ,4, ALIGN_LEFT)  #6*51
+            ('<', '<< '           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
+            ('icon', '     main     ' , ICON_COLOR, 20+3*14,  410, 2, 250-20-3*14    ,1, ALIGN_CENTER),
+            ('>', ' >>'           ,  'lblue'        ,  250, 405,  3, 60     ,1, ALIGN_LEFT)
+
         ]
     help = [
            '^r reboot',
@@ -215,9 +235,11 @@ class Gui(object ):
                   debug:bool = DEBUG):
        
        self.neo=neo
+       self.ns = Touch(isLandscape=False)
+       self.ns.set_int_handler(self.touchscreen_press)
        self.grblParams=grblParams
        self.grblParserObj=grblParserObj
-       self.templateDir = templateDir 
+       self.templateDir = templateDir
 
        try:
             self.templ_files = [ff.replace('.py','') for ff in os.listdir(self.templateDir)  if not (ff.startswith('templateGcode') or ff.startswith('_'))]
@@ -237,6 +259,41 @@ class Gui(object ):
     @property
     def state(self):
         return self.grblParams._state
+    
+    def refresh(self):
+       self.neo_refresh= False
+       refresh(self.neo)
+
+    def set_redButton(self,pin:int):
+       self.pin_yellow=Pin(pin, Pin.IN, Pin.PULL_UP)
+       self.button_yellow=Button(pin=self.pin_yellow,callback=self.button_red_callback,callback_long=self.button_red_callback_long)
+
+    def set_yellowButton(self,pin:int):
+       self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
+       self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
+
+    def button_red_callback(self,pin,button): # right key
+       self.pushButtons(btnN=1,state=1)
+
+           
+             
+
+    def button_red_callback_long(self,pin,button):
+        self.pushButtons(btnN=1,state=2)
+        
+ 
+    def button_yellow_callback(self,pin,button):
+       self.pushButtons(btnN=0,state=1)
+
+
+    def button_yellow_callback_long(self,pin ,button):
+        self.pushButtons(btnN=0,state=2)
+
+
+    def pushButtons(self,btnN,state):
+       while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
+          self.grblButtonHist.pop(0)
+       self.grblButtonHist.append([self.buttonInCounter,btnN,state])            
 
 
     def hello(self):
@@ -258,6 +315,7 @@ class Gui(object ):
        self.neoHighLight(id=self._highlightedArea, labels=self.labels)
        self.neo_refresh= True
        self.templ_labels = {}  # dictionary of configured messages_labels
+       self.show_MPG()
                  
     # initialize neo display labels
     def neoDrawAreas(self, config_array=[]):
@@ -325,8 +383,8 @@ class Gui(object ):
         if  id not in self.labels:
             return
         self.labels[id].text = text
-        if id=='state':
-          self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
+        #if id=='state':
+        #  self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
         
 
 
@@ -350,8 +408,10 @@ class Gui(object ):
              self.labels[id].fgcolor=VFD_RED
         elif id=='feed' and (text.lower().startswith('run') or text.lower().startswith('jog')):
              self.labels[id].fgcolor=VFD_GREEN
-        elif id=='info' and  self.grblParams._mpg:
+        elif id=='info' and  self.grblParams._mpg=='1':
              self.labels[id].fgcolor=VFD_LBLUE
+        elif id=='mpg' and  self.grblParams._mpg=='1':
+             self.labels[id].fgcolor=VFD_GREEN
         elif color is not None:
              self.labels[id].fgcolor=color2rgb(color)
         else:   
@@ -547,7 +607,7 @@ class Gui(object ):
               labels[id].label.fgcolor=labels[id].fgcolor
               labels[id].label.append(labels[id].text[ : labels[id].chars])
               labels[id].label.invertNLine=currentLine
-              if currentLine is not None and labels[id].label.nlines>=(currentLine):
+              if currentLine is not None and labels[id].label.nlines>currentLine:
                  labels[id].label.goto(currentLine)
               else:
                  labels[id].label.goto(0)
@@ -631,24 +691,36 @@ class Gui(object ):
             self.neoWorkCoordinate(id=id)
             self.neoMachineCoordinate(id=id)    
 
+    def show_params(self)  :
+      self.grblParserObj._cnc_params_need_show = False
+      if len(self.grblParserObj._cnc_params)>0:
+        self._current_template_idx=0
+        textline='\n'.join([ff[0][1:]+':'+ff[1] for ff in self.grblParserObj._cnc_params])
+        self.neoTerm(textline,currentLine=self._current_template_idx   )  
+
+
+    def show_MPG(self): 
+       self.grblParserObj._wcs_changed=False
+       self.grblParserObj._mpg_changed=False
+       self.neoLabel( ('MPG' if self.grblParams._mpg=='1' else 'noMPG')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ') ,id='mpg')
+
     def displayState(self):     
       if  self._ui_modes[self._ui_mode] == 'template':
          return 
       if not self.labels['info'].hidden:
         self.neoLabel(self.grblParams._grbl_display_state,id='info')
       
-      if len(self.grblParams._grbl_info)>0:
-         self.neoTerm(self.grblParams._grbl_info)
+      if self.grblParserObj._cnc_params_need_show:
+         self.show_params()
+         
 
       self.show_coordinates()
       
       
       
-      
-      
-      
-      if self.mpg is not None and (self.mpg_prev is None or self.mpg !=self.mpg_prev):
-          self.grblParams._mpg_prev=self.grblParams._mpg
+      if self.grblParserObj.state_is_changed() or self.grblParserObj._wcs_changed or self.grblParserObj._mpg_changed:
+         self.show_MPG()
+
       if self.grblParserObj.state_is_changed() or self.state == 'idle' or self.state.startswith('hold') :  
               if self.state.startswith('alarm'):
                   self._jog_arrow = ''
@@ -691,7 +763,7 @@ class Gui(object ):
               if not labels[id].invert:
                   labels[id].invert = True
 
-                  if  (id in ('x','y','z','dXY','dZ','feed') or id.find('.')>=0) and self.rotaryObj[0]['axe']!=id:
+                  if  (id in ('x','y','z','dXY','dZ','feed','mpg','icon','term') or id.find('.')>=0) and self.rotaryObj[0]['axe']!=id:
                     self.rotaryObj[0]['axe'] = id
                     if id in ('x','y','z'):
                       self.neoWorkCoordinate(id=id)
@@ -718,7 +790,8 @@ class Gui(object ):
 
         for label in self.labels:
             if ((self._ui_modes[self._ui_mode] in ('template') and  label in ('<','>','term')) \
-              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed')) ) \
+              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed','mpg')) ) \
+              or  label in ('icon','term') \
                 and not self.labels[label].hidden:
                 if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
                   and y>=self.labels[label].y-2 and y<=self.labels[label].y+self.labels[label].height+2:
@@ -729,6 +802,15 @@ class Gui(object ):
           self.neoHighLight(id=self._highlightedArea,labels=self.labels)
           if self._highlightedArea in ('<','>'):
              self.nextUiMode(-1 if self._highlightedArea in ('<') else 1)
+          elif self._highlightedArea in ('term') and self._ui_modes[self._ui_mode] in ('template') and self._highlightedArea!=self.rotaryObj[0]['axe']!='term':   
+             #self.rotaryObj[0]['axe']='term'
+             self.neoHighLight(id='term',labels=self.labels)
+             self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
+          elif self._highlightedArea in ('term') and self._ui_modes[self._ui_mode] in ('main','drive')  :   
+             print('point1 ',self._highlightedArea)
+             self.neoHighLight(id='term',labels=self.labels)
+             self.grblParserObj.queryParams()
+             
         elif self._ui_modes[self._ui_mode] in ('template') :  
               
            for label in self.templ_labels:
@@ -752,9 +834,11 @@ class Gui(object ):
 
     def refreshUiMode(self):
       self._ui_confirm='unkn'
+      print('refreshUiMode:',self.rotaryObj[0]['axe'],self._ui_modes[self._ui_mode] )
       if self._ui_modes[self._ui_mode] in ('main','drive'):
         self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
-        self.rotaryObj[0]['axe']='x'
+        if self.rotaryObj[0]['axe']!='icon':
+          self.rotaryObj[0]['axe']='x'
         self.neoIcon(text=self._ui_modes[self._ui_mode])
         self.grblParams._dX2go=0.0
         self.grblParams._dY2go=0.0
@@ -767,15 +851,19 @@ class Gui(object ):
         self.show_dXY()
         self.show_dZ()
         self.show_coordinates()
-        self.neoHighLight(id='x',labels=self.labels) # default highlight x coordinate in main and drive modes
+        
+        if self.rotaryObj[0]['axe']!='icon':
+          self.neoHighLight(id= 'x',labels=self.labels) # default highlight x coordinate in main and drive modes
       elif self._ui_modes[self._ui_mode] in ('template'):
-        self.neoIcon(text=self._ui_modes[self._ui_mode])
-        self.rotaryObj[0]['axe']='term'
+        self.neoIcon(text=self._ui_modes[self._ui_mode]) 
         self.initRotaryStart()
-        self.neoHighLight(id='term',labels=self.labels)
+        if self.rotaryObj[0]['axe']!='icon' :
+          self.rotaryObj[0]['axe']='term'
+          self.neoHighLight(id='term',labels=self.labels)
         self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )  
         self.neoLabel('','info',hidden=True, force=True)
-      
+
+
 
     def nextUiMode(self, direction=None):
         oldUiMode=self._ui_mode
@@ -817,16 +905,27 @@ class Gui(object ):
 
             updated=False
             value = rotObj['obj'].value()
-            if self._ui_modes[self._ui_mode] in ('main','drive'):
-                if rotObj['axe'] in ('x','y','z'):
+            if rotObj['axe'] in ('icon'):
+              rotObj['mpos'] = self._ui_mode
+              rotObj['rotary_on_mpos'] = value 
+              updated=True 
+            elif self._ui_modes[self._ui_mode] in ('main','drive'):
+                if rotObj['axe'] in ('term'):  
+                  rotObj['mpos'] = self._current_template_idx
+                  rotObj['rotary_on_mpos'] = value 
+                  updated=True
+                elif rotObj['axe'] in ('x','y','z'):
                   rotObj['mpos'] = (self.grblParams._mX if rotObj['axe']=='x' else ( self.grblParams._mY if rotObj['axe']=='y' else self.grblParams._mZ ))
                 elif rotObj['axe'] in ('dXY','dZ'): 
                   if self._ui_modes[self._ui_mode] in ('main'):
                     rotObj['mpos'] = (self._dXY_jog if rotObj['axe']=='dXY' else self._dZ_jog )
                   else:  
                     rotObj['mpos'] = (self._dXY_run if rotObj['axe']=='dXY' else self._dZ_run )
+                elif rotObj['axe'] in ('mpg'):     
+                   rotObj['mpos'] = 1 if self.grblParams._mpg=='1' else 0
                 elif rotObj['axe'] in ('feed'):  
                   rotObj['mpos'] = (self._feedrateJog if self._ui_modes[self._ui_mode] in ('main') else self._feedrateRun )
+
                 if self._ui_modes[self._ui_mode] in ('main'):
                   rotObj['rotary_on_mpos'] = value
                 elif self._ui_modes[self._ui_mode] in ('drive'):
@@ -894,6 +993,46 @@ class Gui(object ):
         self.showFeed()
         self.rotaryObj[rotN]['updated'] = True
 
+    def upd_rotary_on_mpg(self,rotN:int):  
+        index_prev = 1 if self.grblParams._mpg=='1' else 0
+        #print('upd_rotary_on_mpg[0]',index_prev)      
+        try:
+          index = index_prev
+        except ValueError:
+          print(f"The value {self.grblParams._mpg  } is not in the array.")
+          index = 0
+        index+=(1 if self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']>0 else -1)
+        if index>=1:
+          index=1
+        elif index<0:
+          index=0
+        if index_prev!=index:
+           #print('upd_rotary_on_mpg[1]',index)      
+           self.grblParserObj.toggleMPG()
+        self.show_MPG() 
+        self.initRotaryStart()
+        self.rotaryObj[rotN]['updated'] = True
+
+    def upd_rotary_on_icon(self,rotN:int):
+        print('upd_rotary_on_icon')  
+        self.nextUiMode((1 if self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']>0 else -1))
+        self.rotaryObj[rotN]['updated']=True
+
+
+    def upd_rotary_on_term(self,rotN:int):
+        if self.rotaryObj[rotN]['obj'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
+           return            
+        delta_val = self.rotaryObj[rotN]['obj'].value() - self.rotaryObj[rotN]['rotary_on_mpos']
+        if delta_val==0 :
+            return
+        print('upd_rotary_on_term 3') 
+        if self._ui_modes[self._ui_mode] == 'template': 
+          self.termShiftPos(rotN, delta_val, self.templ_files)
+        else:    
+          self.termShiftPos(rotN, delta_val, self.grblParserObj._cnc_params)
+        
+
+
     def upd_rotary_on_scale_jog(self,rotN:int):        
         try:
           index = DXYZ_STEPS.index(self._dXY_jog if self.rotaryObj[rotN]['axe']=='dXY' else self._dZ_jog)
@@ -935,13 +1074,29 @@ class Gui(object ):
         self.rotaryObj[rotN]['updated'] = True
 
 
+    def termShiftPos(self,rotN, delta_val, lst):
+        self.initRotaryStart()  
+        if self._current_template_idx is None or len(lst)<1:
+            return
+        index = self._current_template_idx + (1 if delta_val>0 else -1)
+        if index > len(lst)-1:
+            self._current_template_idx=len(lst)-1
+        elif index<0:
+            self._current_template_idx=0
+        else:
+            self._current_template_idx=index
+        
+        self.rotaryObj[rotN]['updated'] = True
+        self.neoDraw('term', labels=self.labels, currentLine=self._current_template_idx)   
+
+
+
     def upd_rotary_on_main(self,rotN:int):    
         if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
            return
         delta_val = self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']
         if delta_val==0 :
             return
-        
         if self.rotaryObj[rotN]['axe']=='x':
             step = delta_val *  self._dXY_jog
             self.grblJog(x=step, feedrate=self._feedrateJog)
@@ -955,7 +1110,10 @@ class Gui(object ):
             self.upd_rotary_on_scale_jog(rotN)
         elif self.rotaryObj[rotN]['axe'] in( 'feed' ):
           self.upd_rotary_on_feed(rotN) 
-
+        elif self.rotaryObj[rotN]['axe'] in( 'mpg' ):
+          self.upd_rotary_on_mpg(rotN)
+        #elif self.rotaryObj[rotN]['axe'] in( 'term' ):  
+        #  self.termShiftPos(rotN, delta_val, self.grblParserObj._cnc_params)
 
 
 
@@ -989,7 +1147,7 @@ class Gui(object ):
             self.upd_rotary_on_scale_run(rotN)
         elif self.rotaryObj[rotN]['axe'] in( 'feed' ):
           self.upd_rotary_on_feed(rotN) 
-
+            
     def upd_rotary_on_template(self,rotN:int):
         if self.rotaryObj[rotN]['obj'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
            return            
@@ -998,22 +1156,7 @@ class Gui(object ):
             return
         #step = delta_val * self.rotaryObj[rotN]['unit'] *  self.rotaryObj[rotN]['scale']
 
-        if self.rotaryObj[rotN]['axe']=='term':
-            if self._current_template_idx is None:
-                return
-            #print('old pos d, val, from',delta_val,self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'])
-            index = self._current_template_idx + (1 if delta_val>0 else -1)
-            if index > len(self.templ_files)-1:
-                self._current_template_idx=len(self.templ_files)-1
-            elif index<0:
-                self._current_template_idx=0
-            else:
-                self._current_template_idx=index
-            self.initRotaryStart()  
-            self.rotaryObj[rotN]['updated'] = True
-            #print('  new pos val, from',self.rotaryObj[rotN]['obj'].value() , self.rotaryObj[rotN]['rotary_on_mpos'],'self._current_template_idx',self._current_template_idx)
-            #self.neoTerm('\n'.join([ff.replace('.py','') for ff in self.templ_files]),currentLine=self._current_template_idx  )
-            self.neoDraw('term', labels=self.labels, currentLine=self._current_template_idx)
+
         elif self.rotaryObj[rotN]['axe'].find('.') >=0:
           if self.grblParserObj.template.params is not None:
             param=self.rotaryObj[rotN]['axe'][self.rotaryObj[rotN]['axe'].find('.')+1:]
@@ -1291,15 +1434,16 @@ class Gui(object ):
 
     # task every 1s
     def upd_rotary(self):
-        #print ('upd_rotary: every 1s')
+        
         for rotN in range(len(self.rotaryObj)):
             if self.rotaryObj[rotN]['obj'] is not None  :
                 if self.rotaryObj[rotN]['updated'] and \
-                  (self._ui_modes[self._ui_mode] == 'drive' or self._ui_modes[self._ui_mode] == 'template' or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
+                  (self._ui_modes[self._ui_mode] == 'drive' or self._ui_modes[self._ui_mode] == 'template' or self.rotaryObj[rotN]['axe'] in ('icon','term') or self.rotaryObj[rotN]['axe'] in ('dXY','dZ','feed')): 
+                  print ('upd_rotary: every 1s[1], updated rotN=',self.rotaryObj[rotN]['axe'])
                   continue
                 
 
-                #print ('upd_rotary: every 1s[2], rotN=',rotN, self._mPosInited , self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'])
+                #print ('upd_rotary: every 1s[2], rotN=',rotN, self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'],self.rotaryObj[rotN]['axe'])
                 if self.rotaryObj[rotN]['state'] not in ('jog','run','planed'):
                     #print ('upd_rotary: every 1s[3], rotN=',rotN, time.time_ns()-self.rotaryObj[rotN]['nanosec'],time.time_ns(),self.rotaryObj[rotN]['nanosec'])
                     if self.rotaryObj[rotN]['value'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None or self.rotaryObj[rotN]['nanosec'] is None:
@@ -1310,18 +1454,21 @@ class Gui(object ):
                     if self.rotaryObj[rotN]['value'] == self.rotaryObj[rotN]['rotary_on_mpos'] :
                        #print ('upd_rotary: scip when value not changed')
                        continue
-                    #print ('upd_rotary: every 1s[2], rotN=',rotN, self._mPosInited , self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'],'mode',self._ui_modes[self._ui_mode])
-                    if self._ui_modes[self._ui_mode] == 'main':
+                    #print ('upd_rotary: every 1s[4], rotN=',rotN,'axe',self.rotaryObj[rotN]['axe'],   self.rotaryObj[rotN]['state'], self.rotaryObj[rotN]['value'],'mode',self._ui_modes[self._ui_mode])
+                    if self.rotaryObj[rotN]['axe'] in ('icon') :
+                       self.upd_rotary_on_icon(rotN)
+                    elif self.rotaryObj[rotN]['axe'] in ('term') :
+                       self.upd_rotary_on_term(rotN)   
+                    elif self._ui_modes[self._ui_mode] == 'main':
                       self.upd_rotary_on_main(rotN)
                     elif self._ui_modes[self._ui_mode] == 'drive':
                       self.upd_rotary_on_drive(rotN)
                     elif self._ui_modes[self._ui_mode] == 'template':
-                      self.upd_rotary_on_template(rotN)  
+                      self.upd_rotary_on_template(rotN)
 
-                    # if self._ui_modes[self._ui_mode] == 'feedJog':
-                    #   self.upd_rotary_on_feedJog(rotN)
-                    # if self._ui_modes[self._ui_mode] == 'feedRun':
-                    #   self.upd_rotary_on_feedRun(rotN)
+                    
+                          
+
                      
 
 

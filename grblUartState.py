@@ -56,7 +56,7 @@ class GrblParams:
         self._dC2go:float = 0.0
   
         
-        self._mpg:str = None
+        self._mpg:str = ''
         self._mpg_prev:str = ''
         self._wcs:str = ''
         self._wcs_prev:str = ''
@@ -74,7 +74,7 @@ NOBLINK = 4
 
 DEBUG= False
 MAX_UART_BUFFER_SIZE=20
-MAX_BUTTON_BUFFER_SIZE=20
+
 
 
 
@@ -94,6 +94,8 @@ POP_CMD_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 POP_UART_GRBL_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 RUN_NOW_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
 POP_BUTTON_INTERVAL=  300000000 # 0.3s in nanoseconds for pop cmd to grbl
+NEO_REFRESH_INTERVAL =  200000000 # 0.2s in nanoseconds for pop cmd to grbl
+BUTTON_REFRESH_INTERVAL =  500000000 # 0.5s in nanoseconds for pop cmd to grbl
 
 
 MAX_BUFFER_SIZE = 200
@@ -153,8 +155,10 @@ class GrblState(object):
     #work coordinate offset (WCO). Used to calculate WPos from MPos 
 
     _wcs_changed:bool = False
+    _mpg_changed:bool = False
     neo = None
     
+
 
     debug:bool = DEBUG 
     _error:str = ''
@@ -162,6 +166,10 @@ class GrblState(object):
     
 
     _parse_state_code:str='init'
+    _cnc_params =[]
+    _cnc_params_update = False
+    _cnc_params_need_show = False
+    _cnc_params_need_clear = False
      
     _query4MPG_countDown:int = 10
     _queries:int = 0
@@ -181,8 +189,7 @@ class GrblState(object):
     grblCmd2send=[]
     grblCmdHist=[]
     grblCmd2HistPos:int = 0
-    grblButtonHist=[]
-    buttonInCounter=0
+
 
 
 
@@ -204,12 +211,15 @@ class GrblState(object):
         self.neo = neo        
         self.templateDir = templateDir
         self.gui=Gui(neo=self.neo, grblParams=self.grblParams,grblParserObj=self, debug=self.debug, templateDir=self.templateDir)
+        #tasks
         self.rt['upd_rotary'] = {'last_start': time.time_ns (), 'disabled': False, 'interval': ROTARY_DUMP2_JOG_INTERVAL, 'proc': self.upd_rotary , 'last_error': 0}
         self.rt['query4MPG'] = {'last_start': time.time_ns (), 'disabled': False,'interval': MPG_INTERVAL, 'proc': self.query4MPG , 'last_error': 0}
         self.rt['popCmd2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_CMD_GRBL_INTERVAL, 'proc': self.popCmd2grbl , 'last_error': 0}
         self.rt['autoQuery2grbl'] = {'last_start': time.time_ns (), 'disabled': False,'interval': GRBL_QUERY_INTERVAL_IDLE, 'proc': self.autoQuery2grbl , 'last_error': 0}
         self.rt['parseUartBuffer'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_UART_GRBL_INTERVAL, 'proc': self.parseUartBuffer , 'last_error': 0}
         self.rt['popButtons'] = {'last_start': time.time_ns (), 'disabled': False,'interval': POP_BUTTON_INTERVAL, 'proc': self.popButtons , 'last_error': 0}
+        self.rt['guiRefresh'] = {'last_start': time.time_ns (), 'disabled': False,'interval': NEO_REFRESH_INTERVAL, 'proc': self.guiRefresh , 'last_error': 0}
+        self.rt['yellowAndRedPressed'] = {'last_start': time.time_ns (), 'disabled': False,'interval': BUTTON_REFRESH_INTERVAL, 'proc': self.yellowAndRedPressed , 'last_error': 0}
         
         
         self.uart_grbl_mpg = uart_grbl_mpg
@@ -275,12 +285,18 @@ class GrblState(object):
             self.rt[id]['disabled'] = value
             if value:
                self.rt[id]['last_start'] = time.time_ns()- int(self.rt[id]['interval']*.5)
-               
 
-
-
-
+    #task           
+    def guiRefresh(self):
+        if self._cnc_params_need_show:
+          self.gui.show_params()   
+        if self.gui.neo_refresh:
+          self.gui.refresh()
             
+    #task           
+    def yellowAndRedPressed(self):
+        if self.gui.pin_red.value()==0 and  self.gui.pin_yellow.value()==0:
+           machine.reset()
             
   
 
@@ -320,15 +336,24 @@ class GrblState(object):
     
     def toggleMPG(self):
         print('toggleMPG',self._query4MPG_countDown)
-        self.gui.neoLabel("#",id='cmd')
+        self.gui.neoLabel("# toggle MPG",id='cmd')
         #self.uart_grbl_mpg.write(bytearray(b'\x8b\r\n'))
         self.uart_grbl_mpg.write(bytearray(b'\x8b'))
         self.query_now('toggleMPG')
 
+
+    def queryParams(self):
+        print('queryParams')
+        self.gui.neoLabel("# $$ ",id='cmd')
+        self.uart_grbl_mpg.write('$$'.encode()+b'\r\n')
+        self.query_now('queryParams')
+
+
+
     #task to query MPG state and update self.grblParams._mpg accordingly. It is called periodically by real time scheduler and also after sending MPG toggle command to grbl. It uses self._query4MPG_countDown to limit number of queries after MPG toggle command, because some grbl versions send multiple status reports with wrong MPG state after toggle command.
     def query4MPG(self):
         #print('in query4MPG',self._query4MPG_countDown,self._queries,self._queries_on_mpg, self.grblParams._mpg)
-        if (self.grblParams._mpg is None or self.grblParams._mpg==0) and self._query4MPG_countDown>0 and self._queries>self._queries_on_mpg:
+        if (self.grblParams._mpg is None or self.grblParams._mpg=='0' or self.grblParams._mpg=='' ) and self._query4MPG_countDown>0 and self._queries>self._queries_on_mpg:
            #print('in query4MPG[2]',self._query4MPG_countDown)
            self._queries_on_mpg= self._queries
            self._query4MPG_countDown -= 1
@@ -539,6 +564,19 @@ class GrblState(object):
         self._state_is_changed = False
         return l_changed
         
+    def updateParams(self,lineStateIn:str):
+      if self._cnc_params_need_clear :
+        self._cnc_params = []
+        self._cnc_params_need_clear = False
+      if lineStateIn.find('=')>=0:
+        k=lineStateIn.split('=')[0]
+        v=lineStateIn.split('=')[1].strip()
+        cut=[cc for cc in (v.find('<'),v.find('['),v.find('ok'))  if cc>=0 ] 
+        if len(cut)>0:
+            v=v[:min(cut)]
+        if v is not None and v!='':
+          self._cnc_params.append([k,v])
+          self._cnc_params_update = True
             
     #MPG -> <Idle|MPos:30.000,0.000,0.000|Bf:35,1023|FS:0,0,0|Pn:HS|WCO:0.000,0.000,0.000|WCS:G54|A:|Sc:|MPG:1|H:0|T:0|TLR:0|Sl:0.0|FW:grblHAL>
     def parseStateOne(self,lineStateIn:str):
@@ -549,6 +587,21 @@ class GrblState(object):
           self._parse_state_code='empty'
           return
         lineStateIn=lineStateIn.strip()
+        if lineStateIn.startswith('['):
+           print('parseStateOne:',lineStateIn)
+        
+        if lineStateIn.startswith('$'):
+           self.updateParams(lineStateIn)
+           return
+        else:
+            self._cnc_params_need_clear = True
+            if self._cnc_params_update:
+              self._cnc_params_need_show = True
+              self._cnc_params_update = False
+            
+        
+        
+        
            
 
         #print('lineStateIn IN ',lineStateIn)  
@@ -556,7 +609,7 @@ class GrblState(object):
         #grblState=grblState.replace('ok','').replace('\n','').replace('\r','')
         self._parse_state_code='parse'
         if lineStateIn.startswith('ok'):
-          #print('OKKor',lineStateIn,']]]]]]]]]]]]]','prev:', self._grblExecProgress)  
+          print('OKKor',lineStateIn,']]]]]]]]]]]]]','prev:', self._grblExecProgress)  
           if self._grblExecProgress=='do':
              self._grblExecProgress='doing'
           elif self._grblExecProgress=='doing':
@@ -565,6 +618,7 @@ class GrblState(object):
             self._grblExecProgress='ok'
           self.changeState('ok')
           self._parse_state_code='done'
+
           return        
         elif lineStateIn.startswith('alarm:'):
           print('ALarm',lineStateIn,']]]]]]]]]]]]]')  
@@ -589,15 +643,8 @@ class GrblState(object):
                   l_state = token
                 else:
                     elem = token.split(':')
-                    if len(elem)>1 and elem[0]=='mpg' and elem[1] is not None and (elem[1]=='1' or elem[1]=='0'):
-                        print('elem mpg',elem)
-                        self.grblParams._mpg_prev=self.grblParams._mpg
-                        self.grblParams._mpg=(elem[1]=='1')
-                        self.gui.labels['info'].color=VFD_LBLUE if self.grblParams._mpg  else VFD_WHITE
-                        if self.grblParams._mpg==1:
-                            print('MPG reached')
-                            self._query4MPG_countDown = 0
-                        
+                    if len(elem)>1 and elem[0]=='mpg' and elem[1] is not None:
+                        self.changeMPG(elem[1])
                     elif  len(elem)>1 and elem[0]=='mpos' and elem[1] is not None:       
                         self.changeMpos(elem[1].split(','))
                     elif  len(elem)>1 and elem[0]=='wco' and elem[1] is not None:
@@ -609,7 +656,8 @@ class GrblState(object):
             self._parse_state_code='done'
             return
         
-        elif lineStateIn.find('[')>=0 and lineStateIn.find(']')>=0 and  lineStateIn.find('[')<lineStateIn.find(']')>=0 :
+        elif lineStateIn.find('[')>=0 and lineStateIn.find(']')>=0 and  lineStateIn.find('[')<lineStateIn.find(']') :
+            print('parseStateOne: [2]',lineStateIn)  
             lineStateIn=lineStateIn[lineStateIn.find('['):lineStateIn.find('[')+1]
             self.grblParams._grbl_info=lineStateIn
             if lineStateIn.count('Unlocked')>0:
@@ -644,8 +692,13 @@ class GrblState(object):
 
     def parseState(self, stateIn:str):
       for item in stateIn.splitlines():
-        if item.strip()!='':
-          self.parseStateOne(item)
+        vv=item.strip()
+        if vv!='':
+          if vv.find('<')>1:
+            self.parseStateOne(vv[:vv.find('<')])
+            self.parseStateOne(vv[vv.find('<'):])
+          else:
+            self.parseStateOne(vv)
 
     def changeState(self,newState:str):
         prv = self.grblParams._state_prev
@@ -771,6 +824,19 @@ class GrblState(object):
          self.gui.neo_refresh= True
             
 
+    def changeMPG(self, mpg):
+      self.grblParams._mpg_prev=self.grblParams._mpg
+      self.grblParams._mpg=mpg
+      self._mpg_changed = (self.grblParams._mpg_prev != self.grblParams._mpg)
+      if self._mpg_changed:
+         print('changeMPG:', self.grblParams._mpg)
+         if self.grblParams._mpg=='1':
+            print('MPG reached')
+            self._query4MPG_countDown = 0
+         self.gui.neo_refresh= True
+
+                        
+
     # callback for rotary 0 (x)
     def rotary_listener0(self):
         self.gui.rotary_listener(0)
@@ -792,39 +858,12 @@ class GrblState(object):
 
 
 
-    def button_red_callback(self,pin,button): # right key
-       self.pushButtons(btnN=1,state=1)
 
-           
-             
-
-    def button_red_callback_long(self,pin,button):
-        self.pushButtons(btnN=1,state=2)
-        
- 
-    def button_yellow_callback(self,pin,button):
-       self.pushButtons(btnN=0,state=1)
-
-
-    def button_yellow_callback_long(self,pin ,button):
-        self.pushButtons(btnN=0,state=2)
-
-    # def button2_YR_callback_long(self,pin ,button):
-    #    print('button2_YR_callback_long: red and  yellow together press long')
-
-    # def button2_YR_callback(self,pin ,button):
-    #    print('button2_YR_callback: red and  yellow together pressed short')
-
-
-    def pushButtons(self,btnN,state):
-       while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
-          self.grblButtonHist.pop(0)
-       self.grblButtonHist.append([self.buttonInCounter,btnN,state])     
 
     # task buttons
     def popButtons(self):
-        if len(self.grblButtonHist)>0:
-          l_buttonEvent=self.grblButtonHist.pop(0)       
+        if len(self.gui.grblButtonHist)>0:
+          l_buttonEvent=self.gui.grblButtonHist.pop(0)       
           if l_buttonEvent[1]==0: #yellow
             if l_buttonEvent[2]==2: #long
               print('button_yellow_callback_long')
