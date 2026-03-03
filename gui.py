@@ -77,6 +77,10 @@ PENDANT_READ_INTERVAL =  300000000 # 0.3s in nanoseconds for pop cmd to grbl
 GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MAX_BUTTON_BUFFER_SIZE=20
 
+BLANK_SCREEN_MS = 3600_000  # 3660s -> 1 hour
+
+
+
 DEBUG= False
 
 class NeoLabelObj(object):
@@ -175,6 +179,9 @@ class Gui(object ):
     grblButtonHist=[]
     buttonInCounter=0
 
+    _blank=False
+    _touched=time.ticks_ms()
+    
     def set_yellowButton(self,pin:int):
        self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
        self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
@@ -252,6 +259,7 @@ class Gui(object ):
 
 
        self.debug=debug
+       self._touched=time.ticks_ms()
        self.neoInit()
        #self.hello()
        
@@ -262,6 +270,7 @@ class Gui(object ):
     
     def refresh(self):
        self.neo_refresh= False
+       self.neoBlank(time.ticks_diff(time.ticks_ms(),self._touched)>BLANK_SCREEN_MS)
        refresh(self.neo)
 
     def set_redButton(self,pin:int):
@@ -291,9 +300,16 @@ class Gui(object ):
 
 
     def pushButtons(self,btnN,state):
+       self._touched=time.ticks_ms()
        while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
           self.grblButtonHist.pop(0)
        self.grblButtonHist.append([self.buttonInCounter,btnN,state])            
+
+    def neoBlank(self, blank = True):
+       if self._blank!=blank or self.neo._blank!=blank:
+        self._blank=blank
+        self.neo._blank=self._blank
+        print("neoBlank:",self._blank)
 
 
     def hello(self):
@@ -380,6 +396,8 @@ class Gui(object ):
     # ui label`s updater
     #def neoLabel(self,text,id='info',color=None,currentLine=None, hidden=None, force=False):
     def neoLabel(self,text,id,color=None,currentLine=None, hidden=None, force=False):
+        if self._blank:
+           return
         if  id not in self.labels:
             return
         self.labels[id].text = text
@@ -390,7 +408,7 @@ class Gui(object ):
 
  
 
-
+       
         if hidden is not None :
           if hidden and self.labels[id].hidden and not force:
               return
@@ -721,10 +739,12 @@ class Gui(object ):
        self.grblParserObj._mpg_changed=False
        self.neoLabel( ('MPG' if self.grblParams._mpg=='1' else 'noMPG')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ') ,id='mpg')
 
-    def displayState(self):     
+    def displayState(self,DisplayInfoLen=0):     
       if  self._ui_modes[self._ui_mode] == 'template':
          return 
-      if not self.labels['info'].hidden:
+      if DisplayInfoLen>4:
+         return 
+      if not self.labels['info'].hidden and  DisplayInfoLen<3:
         self.neoLabel(self.grblParams._grbl_display_state,id='info')
       
       if self.grblParserObj._cnc_params_need_show:
@@ -797,7 +817,9 @@ class Gui(object ):
               self.neo_refresh =True          
 
     def touchscreen_press(self,x, y):
-        # print('touchscreen_press:',x,y)  
+        # print('touchscreen_press:',x,y) 
+        self._touched=time.ticks_ms() # lastotuched
+
         self._highlightedArea=''
         self._pressedOldX = self._pressedX
         self._pressedOldY = self._pressedY  
@@ -985,6 +1007,7 @@ class Gui(object ):
 
 
     def rotary_listener(self,rotN):
+        self._touched=time.ticks_ms()
         if self.rotaryObj[rotN]['obj'] is not None:
             self.rotaryObj[rotN]['value_prev']=self.rotaryObj[rotN]['value']
             self.rotaryObj[rotN]['value']=self.rotaryObj[rotN]['obj'].value()

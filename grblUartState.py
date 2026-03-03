@@ -87,6 +87,7 @@ MAX_UART_BUFFER_SIZE=20
 #GRBL_QUERY_INTERVAL = 0.5
 #GRBL_QUERY_INTERVAL_IDLE = 10
 GRBL_QUERY_INTERVAL_IDLE = 10_000_000_000  # 10s in nanoseconds
+#BLANK_SCREEN_INTERVAL = 10_000_000_000  # 100s in nanoseconds
 GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MPG_INTERVAL = 500000000  # 0.5s in nanoseconds
 ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
@@ -288,6 +289,7 @@ class GrblState(object):
 
     #task           
     def guiRefresh(self):
+
         if self._cnc_params_need_show:
           self.gui.show_params()   
         if self.gui.neo_refresh:
@@ -748,7 +750,7 @@ class GrblState(object):
        while len(self.bufferUartIn)>0:        
           self.last_uart_mess=self.bufferUartIn.pop(0)
           self.parseState(self.last_uart_mess[1])
-          self.gui.displayState()
+          self.gui.displayState(len(self.bufferUartIn))
           return 0
 
 
