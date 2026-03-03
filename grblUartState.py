@@ -405,6 +405,12 @@ class GrblState(object):
       elif command in ('zeroX','zeroY','zeroZ'):
           cmd='G10L20P1{axe}0'.format(axe=command[-1:])
           self.mpgCommandShow(cmd)  
+      elif command in ('spindeOn'):
+          cmd='M3 S7000'
+          self.mpgCommandShow(cmd)  
+      elif command in ('spindeOff'):
+          cmd='M5'
+          self.mpgCommandShow(cmd)  
       elif command=='-stepXY' :    
           self.gui.dec_stepXY()
           if self.gui._dXY_jog<1:
@@ -870,13 +876,28 @@ class GrblState(object):
                   self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
                   return 0
             elif l_buttonEvent[2]==1: #normal
-              print('button_yellow_callback',self.gui._ui_modes[self.gui._ui_mode],self.gui._ui_modes[self.gui._ui_mode_prev])
+              print('button_yellow_callback',self.gui._ui_modes[self.gui._ui_mode],self.gui._ui_modes[self.gui._ui_mode_prev],'hl=',l_buttonEvent[3])
+              # if l_buttonEvent[3] in ('zeroX','zeroY','zeroZ') and self.gui._ui_modes[self.gui._ui_mode] in ( 'main','confirm'):
+              #   self.send2grblOne(l_buttonEvent[3])
+              #   return 0
+              # if l_buttonEvent[3] in ('spindeOn','spindeOff') and self.gui._ui_modes[self.gui._ui_mode] in ( 'main', 'drive','confirm'):
+              #   self.send2grblOne(l_buttonEvent[3])
+              #   return 0
               
               if self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
                 self._ui_confirm='yes'
                 self.gui._ui_mode= self.gui._ui_mode_prev
                 #print('button_yellow_callback222: confirm mode, self._ui_confirm_prev=',self.gui._ui_modes[self.gui._ui_mode])
-                if self.gui._ui_modes[self.gui._ui_mode]=='template' and self.template is not None:
+                
+                if l_buttonEvent[3] in ('zeroX','zeroY','zeroZ') :
+                  self.send2grblOne(l_buttonEvent[3])
+                  self.gui._ui_mode=self.gui._ui_mode_prev
+                  self.gui.refreshUiMode()                  
+                elif l_buttonEvent[3] in ('spindeOn','spindeOff') :
+                  self.send2grblOne(l_buttonEvent[3])
+                  self.gui._ui_mode=self.gui._ui_mode_prev
+                  self.gui.refreshUiMode()                  
+                elif self.gui._ui_modes[self.gui._ui_mode]=='template' and self.template is not None:
                   self.template.updateParams()
                   cmds=self.template.app.getGcode()
                   if isinstance(cmds,str):

@@ -192,23 +192,28 @@ class Gui(object ):
     labels = {}  # dictionary of configured messages_labels
     templ_labels = {}  # dictionary to store params of template macro
     _msg_conf = [ #name, textline, fgcolor, x, y, scale, width, nlines,align
-            ('info', 'info'      , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
-            ('x', '     '        , X_ARROW_COLOR   ,  150,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
-            ('y', '     '        , Y_ARROW_COLOR   ,  150, 115,  3, 126    ,1, ALIGN_RIGHT),
-            ('z', '     '        , Z_ARROW_COLOR   ,  150, 195,  3, 126    ,1, ALIGN_RIGHT),
-            ('mx', '{:6.2f}'.format(0.0)       , X_ARROW_COLOR   ,  150+67,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
-            ('my', '{:6.2f}'.format(0.0)       , Y_ARROW_COLOR   ,  150+67, 115+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('mz', '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  150+67, 195+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('dXY', '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  150-10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
-            ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  150-10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
+            ('zeroX', 'X'                         , X_ARROW_COLOR   ,  142,  35,  3, 40    ,1, ALIGN_RIGHT), #9*14
+            ('zeroY', 'Y'                         , Y_ARROW_COLOR   ,  142, 115,  3, 40    ,1, ALIGN_RIGHT),
+            ('zeroZ', 'Z'                         , Z_ARROW_COLOR   ,  142, 195,  3, 40    ,1, ALIGN_RIGHT),
+            ('x', '{:6.2f}'.format(-230.1)         , X_ARROW_COLOR   ,  142+25+10,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
+            ('y', '{:6.2f}'.format(-230.1)         , Y_ARROW_COLOR   ,  142+25+10, 115,  3, 126    ,1, ALIGN_RIGHT),
+            ('z', '{:6.2f}'.format(-230.1)         , Z_ARROW_COLOR   ,  142+25+10, 195,  3, 126    ,1, ALIGN_RIGHT),
+            ('mx', '{:6.2f}'.format(0.0)       , X_ARROW_COLOR   ,  142+25+10+30,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
+            ('my', '{:6.2f}'.format(0.0)       , Y_ARROW_COLOR   ,  142+25+10+30, 115+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('mz', '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  142+25+10+30, 195+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('dXY', '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  142+10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
+            ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  142+10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
             ('cmd', '#G29 some command grbl'      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
             ('feed', '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
             ('state', 'Initial'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
             ('mpg', 'noMPG G57'    , 'white'         ,  220,  0,  2, 310-120,1, ALIGN_RIGHT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
-            ('<', '<< '           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
+            ('spindeOn', 'ON'           ,  'green'       ,   10, 370,  3, 60     ,1, ALIGN_LEFT),
+            ('spindeOff', 'OFF'           ,  'red'        ,  250, 370,  3, 60     ,1, ALIGN_RIGHT),
+            ('info', 'info'                        , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
+            ('<', '<<'           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
             ('icon', '     main     ' , ICON_COLOR, 20+3*14,  410, 2, 250-20-3*14    ,1, ALIGN_CENTER),
-            ('>', ' >>'           ,  'lblue'        ,  250, 405,  3, 60     ,1, ALIGN_LEFT)
+            ('>', '>>'           ,  'lblue'        ,  270, 405,  3, 60     ,1, ALIGN_LEFT)
 
         ]
     help = [
@@ -303,7 +308,7 @@ class Gui(object ):
        self._touched=time.ticks_ms()
        while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
           self.grblButtonHist.pop(0)
-       self.grblButtonHist.append([self.buttonInCounter,btnN,state])            
+       self.grblButtonHist.append([self.buttonInCounter,btnN,state, self._highlightedArea ] )            
 
     def neoBlank(self, blank = True):
        if self._blank!=blank or self.neo._blank!=blank:
@@ -357,14 +362,23 @@ class Gui(object ):
                 ll=Label(writer, y, x+flw, '{:6.2f}'.format(val), bdcolor=False, fgcolor=fgcolor, align=align)
                 rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
                 labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
+            # elif name in ('xyz'):
+            #   flw=writer.stringlen(name.upper()+': ')
+            #   fl=Label(writer, y, x, name.upper()+': ',fgcolor=VFD_RED if name=='x'  else VFD_GREEN if name=='y' else VFD_LBLUE)
+            #   ll=Label(writer, y, x+flw, '{:6.2f}'.format(-230.1), fgcolor=fgcolor, bdcolor=False, align=align)
+            #   labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
             elif name in ('xyz'):
-              flw=writer.stringlen(name.upper()+': ')
-              fl=Label(writer, y, x, name.upper()+': ',fgcolor=VFD_RED if name=='x'  else VFD_GREEN if name=='y' else VFD_LBLUE)
-              ll=Label(writer, y, x+flw, '{:6.2f}'.format(-230.1), fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
+              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
+            elif name in ('zeroX','zeroY','zeroZ'):
+              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
+            elif name in ('spindeOn','spindeOff'):
+              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
             elif name in ('mx','my','mz'):
               ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
             elif name in ('state','cmd','icon'):
               ll=Label(writer, y, x, (textline if textline.strip()!='' else name),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
@@ -384,12 +398,8 @@ class Gui(object ):
                   ll.append(textline)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
             else: # etc
-              ll=Label(writer, y, x, width,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              if textline.strip()!='':
-                  ll.value(textline,fgcolor=fgcolor, align=align)
-              else:    
-                ll.value(name,fgcolor=fgcolor, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
+                ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
+                labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
         return labels
 
 
@@ -742,7 +752,7 @@ class Gui(object ):
     def displayState(self,DisplayInfoLen=0):     
       if  self._ui_modes[self._ui_mode] == 'template':
          return 
-      if DisplayInfoLen>4:
+      if DisplayInfoLen>6:
          return 
       if not self.labels['info'].hidden and  DisplayInfoLen<3:
         self.neoLabel(self.grblParams._grbl_display_state,id='info')
@@ -755,7 +765,8 @@ class Gui(object ):
       
       
       
-      if self.grblParserObj.state_is_changed() or self.grblParserObj._wcs_changed or self.grblParserObj._mpg_changed:
+      #if self.grblParserObj.state_is_changed() or self.grblParserObj._wcs_changed or self.grblParserObj._mpg_changed:
+      if self.grblParserObj._wcs_changed or self.grblParserObj._mpg_changed:
          self.show_MPG()
 
       if self.grblParserObj.state_is_changed() or self.state == 'idle' or self.state.startswith('hold') :  
@@ -805,6 +816,12 @@ class Gui(object ):
                     if id in ('x','y','z'):
                       self.neoWorkCoordinate(id=id)
                     self.initRotaryStart()
+                  elif id in ('zeroX','zeroY','zeroY') and self._ui_modes[self._ui_mode] in ('main','drive') and \
+                        self.rotaryObj[0]['axe']!=id[4].lower():
+                     self.rotaryObj[0]['axe'] = id[4].lower()
+                     self.neoWorkCoordinate(id=id[4].lower())
+                     self.initRotaryStart() 
+
 
                   self.neoDraw(id,labels=labels)
               for lIdx in labels:
@@ -829,7 +846,8 @@ class Gui(object ):
 
         for label in self.labels:
             if ((self._ui_modes[self._ui_mode] in ('template') and  label in ('<','>','term')) \
-              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed','mpg')) ) \
+                
+              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed','mpg','zeroX','zeroY','zeroZ','spindeOn','spindeOff')) ) \
               or  label in ('icon','term') \
                 and not self.labels[label].hidden:
                 if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
@@ -839,7 +857,11 @@ class Gui(object ):
         if self._highlightedArea!='':
           print('  pressed ',self._highlightedArea)
           self.neoHighLight(id=self._highlightedArea,labels=self.labels)
-          if self._highlightedArea in ('<','>'):
+          if self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff') and self._ui_modes[self._ui_mode] in ('main','drive'):
+            self._ui_confirm='OK'
+            self.enterConfirmMode()
+            self.neoIcon(text=self._ui_modes[self._ui_mode])
+          elif self._highlightedArea in ('<','>'):
              self.nextUiMode(-1 if self._highlightedArea in ('<') else 1)
           elif self._highlightedArea in ('term') and self._ui_modes[self._ui_mode] in ('template') and self._highlightedArea!=self.rotaryObj[0]['axe']!='term':   
              #self.rotaryObj[0]['axe']='term'
@@ -875,7 +897,7 @@ class Gui(object ):
       print('refreshUiMode:',self.rotaryObj[0]['axe'],self._ui_modes[self._ui_mode] )
       if self._ui_modes[self._ui_mode] in ('main','drive'):
         self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
-        if self.rotaryObj[0]['axe']!='icon':
+        if self.rotaryObj[0]['axe']!='icon' and not self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff'):
           self.rotaryObj[0]['axe']='x'
         self.neoIcon(text=self._ui_modes[self._ui_mode])
         self.grblParams._dX2go=0.0
