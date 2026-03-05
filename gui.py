@@ -5,6 +5,7 @@ from nanoguilib.writer import CWriter
 from nanoguilib.meter import Meter
 from nanoguilib.label import Label, ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER 
 from nanoguilib.textbox import Textbox
+from nanoguilib.colors import *
 
 # Fonts
 import nanoguilib.arial10 as arial10
@@ -15,6 +16,7 @@ from nanoguilib.nanogui import refresh
 from machine import  Pin
 from button import Button
 from ns2009 import Touch
+from array import array
 
 
 Y_POS_LABEL_PARAMS=280
@@ -28,17 +30,31 @@ VFD0_YELLOW = 0xFFFF00
 VFD0_YELLOW2 = 0xBFBF00
 VFD0_WHITE = 0xCFCFCF
 
+# VFD_GRAY = 0x0016 #0x0019 0x001A 0x0006 0x0009
+# VFD_PURPLE = 0x0017 #0x0007
+# VFD_GREEN = 0x0011 #0x0001 0x0021
+# VFD_RED = 0x0002
+# VFD_LBLUE = 0x0008 #0x0018
+# VFD_BLUE = 0x0004 #0x0014
+# VFD_YELLOW = 0x0015 #0x0015 ssd.rgb(0xFF,0xff,0x00)
+# VFD_YELLOW2 = VFD_YELLOW-12
+# VFD_WHITE = 0xffff
+# VFD_BLACK = 0x0000
 
-VFD_GRAY = 0x0016 #0x0019 0x001A 0x0006 0x0009
-VFD_PURPLE = 0x0017 #0x0007
-VFD_GREEN = 0x0011 #0x0001 0x0021
-VFD_RED = 0x0002
-VFD_LBLUE = 0x0008 #0x0018
-VFD_BLUE = 0x0004 #0x0014
-VFD_YELLOW = 0x0005 #0x0015 ssd.rgb(0xFF,0xff,0x00)
-VFD_YELLOW2 = VFD_YELLOW-12
-VFD_WHITE = 0xffff
-VFD_BLACK = 0x0000
+VFD_GRAY = GREY #0x0019 0x001A 0x0006 0x0009
+VFD_PURPLE = MAGENTA #0x0007
+VFD_GREEN = GREEN #0x0001 0x0021
+VFD_RED = RED
+VFD_LBLUE = CYAN #0x0018
+VFD_BLUE = BLUE #0x0014
+VFD_YELLOW = YELLOW #0x0015 ssd.rgb(0xFF,0xff,0x00)
+VFD_YELLOW2 = VFD_YELLOW
+VFD_WHITE = WHITE
+VFD_BLACK = BLACK
+
+
+
+
 
 
 VFD_ARROW_X = VFD_RED
@@ -237,7 +253,27 @@ class Gui(object ):
            '~ start',
            '! feed',
            '? query'
-        ]            
+        ]   
+
+    gridX0=5
+    gridY0=50
+    gridstep=20
+    gridCount=7
+    toolPoly=array('h', [6, 0,\
+                        6, 2,\
+                        3, 5,\
+                        0, 2,\
+                        0, 0\
+                        ])             
+    cncFieldXmax=700
+    cncFieldYmax=700
+    gridMax=(gridCount-1)*gridstep
+    cncFieldKX=gridMax/cncFieldXmax
+    cncFieldKY=gridMax/cncFieldYmax
+    _xToolCnt=0
+    _xToolPrev=None 
+    _yToolPrev=None
+
 
 
 
@@ -316,27 +352,61 @@ class Gui(object ):
         self.neo._blank=self._blank
         print("neoBlank:",self._blank)
 
+    def toolMapX(self,x):
+       pos=x*self.cncFieldKX
+       if pos>self.gridMax :
+          return self.gridX0+self.gridMax
+       elif pos<=0:
+          return self.gridX0
+       else:
+          return self.gridX0+int(pos)
 
-    def hello(self):
-       self.neo.fill(VFD_BG)
-       self.neo.fill_rect(60,5,200,30,self.neo.RED)
-       self.neo.text('GrblHAL v'+self.__version__,90,17,self.neo.WHITE)
-       display_color = 0x001F
-       for i in range(0,12): 
-           self.neo.fill_rect(i*20+30,100,30,50,(display_color))
-           display_color = display_color << 1
-       self.neo.show_up()
-       time.sleep(0.5)
-       self.neo.fill(VFD_BG)
+    def toolMapY(self,y):
+       pos= self.gridMax-y*self.cncFieldKX
+       if pos>self.gridMax :
+          return self.gridY0+self.gridMax
+       elif pos<=0:
+          return self.gridY0
+       else:
+          return self.gridY0+int(pos)
 
-       self.neoLabel('GrblHAL v'+self.__version__,id='cmd',color=VFD_YELLOW)
+
+    def neoGrid(self):
+        self.neoLabel(text='',id='term',hidden=True)
+        for ii in range(self.gridCount):
+          self.neo.hline(self.gridX0,self.gridY0+ii*self.gridstep,self.gridMax,VFD_GRAY)
+          self.neo.vline(self.gridX0+ii*self.gridstep,self.gridY0,self.gridMax,VFD_GRAY) 
+        self._xToolPrev=None 
+        self._yToolPrev=None
+
+
+
+    def neoTool(self,X,Y):
+      self._xToolCnt+=1  
+      if self._xToolPrev is not None and self._yToolPrev is not None:
+         tool=(self.toolMapX(self._xToolPrev)-3,self.toolMapY(self._yToolPrev)-6)
+         self.neo.poly(tool[0],tool[1], self.toolPoly, VFD_BLACK,True )
+         if self._xToolCnt%10==0:
+            self.neoGrid()
+      else: 
+         self.neoGrid()  
+      tool=(self.toolMapX(X)-3,self.toolMapY(Y)-6)
+      self.neo.poly(tool[0],tool[1], self.toolPoly, VFD_YELLOW,True )
+      self._xToolPrev=X
+      self._yToolPrev=Y
+      
        
+      
+
+
+
     def neoInit(self):
        self.labels=self.neoDrawAreas(self._msg_conf)
        self.neoHighLight(id=self._highlightedArea, labels=self.labels)
        self.neo_refresh= True
        self.templ_labels = {}  # dictionary of configured messages_labels
        self.show_MPG()
+       self.neoGrid()
                  
     # initialize neo display labels
     def neoDrawAreas(self, config_array=[]):
@@ -406,6 +476,10 @@ class Gui(object ):
     # ui label`s updater
     #def neoLabel(self,text,id='info',color=None,currentLine=None, hidden=None, force=False):
     def neoLabel(self,text,id,color=None,currentLine=None, hidden=None, force=False):
+        if hidden is not None :
+          if hidden and self.labels[id].hidden and not force:
+              return
+          self.labels[id].hidden = hidden        
         if self._blank:
            return
         if  id not in self.labels:
@@ -419,10 +493,7 @@ class Gui(object ):
  
 
        
-        if hidden is not None :
-          if hidden and self.labels[id].hidden and not force:
-              return
-          self.labels[id].hidden = hidden
+
         if self.labels[id].hidden  :
           self.neoDraw(id, labels=self.labels, currentLine=currentLine)
           return  
@@ -734,6 +805,8 @@ class Gui(object ):
         else:
             self.neoWorkCoordinate(id=id)
             self.neoMachineCoordinate(id=id)    
+        
+        self.neoTool(X=self.grblParams._mX,Y=self.grblParams._mY)  
 
     def show_params(self)  :
       self.grblParserObj._cnc_params_need_show = False

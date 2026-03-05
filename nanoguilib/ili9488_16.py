@@ -23,101 +23,48 @@ import framebuf
 import asyncio
 from nanoguilib.boolpalette import BoolPalette
 
-VFD_GRAY = 0x0016 #0x0019 0x001A 0x0006 0x0009
-VFD_PURPLE = 0x0017 #0x0007
-VFD_GREEN = 0x0011 #0x0001 0x0021
-VFD_RED = 0x0002
-VFD_LBLUE = 0x0008 #0x0018
-VFD_BLUE = 0x0004 #0x0014
-VFD_YELLOW = 0x0005 #0x0015 ssd.rgb(0xFF,0xff,0x00)
-VFD_YELLOW2 = VFD_YELLOW-12
-VFD_WHITE = 0xffff
-VFD_BLACK = 0x0000
-
 # Do processing from end to beginning for
 # small performance improvement.
 # greyscale
 @micropython.viper
 def _lcopy_gs(dest: ptr8, source: ptr8, length: int):
-    # rgb666 - 18bit/pixel
-    n: int = length * 6 - 1
-    while length:
-        length -= 1
-        c: uint = source[length]
-        # Store the index in the 4 high order bits
-        p: uint = c & 0xF0  # current pixel
-        q: uint = c << 4  # next pixel
-
-        dest[n] = q
-        n -= 1
-        dest[n] = q
-        n -= 1
-        dest[n] = q
-        n -= 1
-
-        dest[n] = p
-        n -= 1
-        dest[n] = p
-        n -= 1
-        dest[n] = p
-        n -= 1
+     # rgb565 - 16bit/pixel
+    n = 0
+    for x in range(length):
+        c = source[x]
+        dest[n] = c >> 4  # current pixel
+        n += 1
+        dest[n] = c & 0x0f  # next pixel
+        n += 1
 
 
 # Do processing from end to beginning for
 # small performance improvement.
 # color
 @micropython.viper
-def _lcopy(dest: ptr8, source: ptr8, lut: ptr16, length: int):
-    # Convert lut rgb 565 to rgb666
-    n: int = length * 6 - 1
-    while length:
-        length -= 1
-        c: uint = source[length]
+def _lcopy(dest:ptr16, source:ptr8, lut:ptr16, length:int):
+    # rgb565 - 16bit/pixel
+    n = 0
+    for x in range(length):
+        c = source[x]
+        dest[n] = lut[c >> 4]  # current pixel
+        n += 1
+        dest[n] = lut[c & 0x0f]  # next pixel
+        n += 1
 
-        v = lut[c & 0x0F]  # next pixel
-        dest[n] = (v & 0x001F) << 3  # B
-        n -= 1
-        dest[n] = (v & 0x07E0) >> 3  # G
-        n -= 1
-        dest[n] = (v & 0xF800) >> 8  # R
-        n -= 1
-
-        v: uint = lut[c >> 4]  # current pixel
-        dest[n] = (v & 0x001F) << 3  # B
-        n -= 1
-        dest[n] = (v & 0x07E0) >> 3  # G
-        n -= 1
-        dest[n] = (v & 0xF800) >> 8  # R
-        n -= 1
-
-
-# Do processing from end to beginning for
-# small performance improvement.
-# blank mode
-@micropython.viper
-def _lcopy_blank(dest: ptr8, length: int):
-    # rgb666 - 18bit/pixel
-    n: int = length * 6 - 1
-    while length:
-        length -= 1
-
-        dest[n] = 0
-        n -= 1
-        dest[n] = 0
-        n -= 1
-        dest[n] = 0
-        n -= 1
-
-        dest[n] = 0
-        n -= 1
-        dest[n] = 0
-        n -= 1
-        dest[n] = 0
-        n -= 1
-
+def _lcopy_blank(dest:ptr16,  length:int):
+    # rgb565 - 16bit/pixel
+    n = 0
+    for x in range(length):
+        dest[n] = 0  # current pixel
+        n += 1
+        dest[n] = 0  # next pixel
+        n += 1
+ 
 class ILI9488(framebuf.FrameBuffer):
 
     lut = bytearray(32)
+    #lut = bytearray(0xFF for _ in range(32))  # set all colors to BLACK
     COLOR_INVERT = 0
 
     """Serial interface for 16-bit color (5-6-5 RGB) ILI9488 display.
@@ -195,9 +142,17 @@ class ILI9488(framebuf.FrameBuffer):
     # Convert r, g, b in range 0-255 to a 16 bit colour value
     # 5-6-5 format
     #  byte order not swapped (compared to ili9486 driver).
+    #@classmethod
+    #def rgb(cls, r, g, b):
+    #    return cls.COLOR_INVERT ^ ((r & 0xF8) << 8 | (g & 0xFC) << 3 | (b >> 3))
+    # Convert r, g, b in range 0-255 to a 16 bit colour value rgb565.
+    # LS byte goes into LUT offset 0, MS byte into offset 1
+    # Same mapping in linebuf so LS byte is shifted out 1st
+    ## For some reason color must be inverted on this controller.
     @classmethod
-    def rgb(cls, r, g, b):
-        return cls.COLOR_INVERT ^ ((r & 0xF8) << 8 | (g & 0xFC) << 3 | (b >> 3))
+    def rgb(cls,r, g, b):
+        #return ((b & 0xf8) << 5 | (g & 0x1c) << 11 | (g & 0xe0) >> 5 | (r & 0xf8)) ^ 0xffff    
+        return ((b & 0xf8) << 5 | (g & 0x1c) << 11 | (g & 0xe0) >> 5 | (r & 0xf8)) 
 
     # Transpose width & height for landscape mode
     def __init__(
@@ -243,12 +198,18 @@ class ILI9488(framebuf.FrameBuffer):
         #
         if (self.height % lines_per_write) != 0:
             raise ValueError("lines_per_write invalid")
-        self._lines_per_write = lines_per_write
+        #self._lines_per_write = lines_per_write
+        self._lines_per_write = 1
         gc.collect()
         buf = bytearray(height * width // 2)
         self.mvb = memoryview(buf)
         super().__init__(buf, width, height, self.mode)  # Logical aspect ratio
-        self._linebuf = bytearray(self._lines_per_write * self.width * 3)
+        #self._linebuf = bytearray(self._lines_per_write * self.width * 3)
+        self._linebuf = bytearray(self._lines_per_write *self.width * 2)  # 16 bit color out
+        
+
+
+
 
         # Hardware reset
         if self._rst is not None:
@@ -272,7 +233,8 @@ class ILI9488(framebuf.FrameBuffer):
         sleep_ms(100)
         self._wcmd(int.to_bytes(self.SLPOUT))  # sleep out
         sleep_ms(20)
-        self.write_cmd(self.PIXFMT, 0x66)  # interface pixel format 18 bits per pixel
+        #self.write_cmd(self.PIXFMT, 0x66)  # interface pixel format 18 bits per pixel
+        self.write_cmd(self.PIXFMT, 0x55)  # interface pixel format 18 bits per pixel
         self.write_cmd(self.WRITE_DISPLAY_BRIGHTNESS, 0x07 )
         self.write_cmd(self.WRITE_CTRL_DISPLAY, 0x2c )
         self.write_cmd(self.WRITE_DISPLAY_BRIGHTNESS, 0x77 )
@@ -416,10 +378,12 @@ class ILI9488(framebuf.FrameBuffer):
         self._dc(1)
         self._cs(0)
         wd = self.width >> 1
-        ht = self.height
+        end = self.height * wd
+        #ht = self.height
         spi_write = self._spi.write
         length = self._lines_per_write * wd
-        r = range(0, wd * ht, length)
+        #r = range(0, wd * ht, length)
+        r= range(0, end, wd)
         if self._blank :
             lcopy = _lcopy_blank  # Copy and map colors
             for start in r:  # For each line
@@ -436,6 +400,7 @@ class ILI9488(framebuf.FrameBuffer):
             for start in r:  # For each line
                 lcopy(lb, buf[start:], clut, length)
                 spi_write(lb)
+
         self._cs(1)
 
     def short_lock(self, v=None):
