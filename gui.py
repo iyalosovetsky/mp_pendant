@@ -119,7 +119,9 @@ class NeoLabelObj(object):
         if fldLabel is None:
           self.width= self.label.width
         else:
-          self.width= self.label.width + self.fldLabel.width  
+          #self.width= self.label.width + self.fldLabel.width  
+          self.width = max(self.label.width+  abs(self.label.col-self.fldLabel.col),self.label.width + self.fldLabel.width)
+          #print("Width label: lw=",self.label.width ,'l.col=', self.label.col," Width field: fw=",self.fldLabel.width ,'f.col=', self.fldLabel.col,'self.width=',self.width)
 
           
           
@@ -385,6 +387,7 @@ class Gui(object ):
 
     def neoGrid(self):
         self.neoLabel(text='',id='term',hidden=True)
+        self.neo.fill_rect(self.gridX0,self.gridY0,self.gridMax,self.gridMax,VFD_BLACK)
         for ii in range(self.gridCount):
           self.neo.hline(self.gridX0,self.gridY0+ii*self.gridstep,self.gridMax,VFD_GRAY)
           self.neo.vline(self.gridX0+ii*self.gridstep,self.gridY0,self.gridMax,VFD_GRAY) 
@@ -668,8 +671,8 @@ class Gui(object ):
         if len(self.grblParserObj._cnc_params)>0 and self._current_template_idx<len(self.grblParserObj._cnc_params) :
           #print('point2 ',self._current_template_idx,self.grblParserObj._cnc_params)
           ff=self.grblParserObj._cnc_params[self._current_template_idx] 
-          xx=10
-          yy=Y_POS_LABEL_PARAMS
+          xx=60
+          yy=Y_POS_LABEL_PARAMS+30
           templ_config.append((template_name+'.'+ff[0], ff[1] , 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
           rows=1
           #ii+=1
@@ -683,9 +686,11 @@ class Gui(object ):
             yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS
             templ_config.append((template_name+'.'+param, '{0:.1f}'.format(val) , 'yellow'   ,  xx,  yy,  1, xw-10,1, ALIGN_RIGHT))
             ii+=1
-            xx=int((ii%PARAMS_IN_ROW)*(xw+0.4))
-            yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS    
-            templ_config.append((template_name+'.OK', '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
+        
+        
+        xx=int((ii%PARAMS_IN_ROW)*(xw+0.4))
+        yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS    
+        templ_config.append((template_name+'.OK', '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
 
       
 
@@ -995,6 +1000,8 @@ class Gui(object ):
                 if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
                   and y>=self.labels[label].y-2 and y<=self.labels[label].y+self.labels[label].height+2:
                     self._highlightedArea=label
+                    
+                    self.neoPressedDrawPoint()    
                     break
         if self._highlightedArea!='':
           print('  pressed ',self._highlightedArea)
@@ -1018,6 +1025,7 @@ class Gui(object ):
               if x>=self.templ_labels[label].x-5 and x<=self.templ_labels[label].x+self.templ_labels[label].width \
                   and y>=self.templ_labels[label].y-10 and y<=self.templ_labels[label].y+self.templ_labels[label].height+10:
                     self._highlightedArea=label
+                    print('  touched template/params ',self._highlightedArea,self.templ_labels[label].x,self.templ_labels[label].y,self.templ_labels[label].width,self.templ_labels[label].height)
                     break
            if self._highlightedArea!='':
               print('  pressed template ',self._highlightedArea,self.rotaryObj[0]['axe'])
@@ -1032,6 +1040,7 @@ class Gui(object ):
            #   self.neoPressedDrawPoint()   
         if self._highlightedArea=='' and self.debug:
             self.neoPressedDrawPoint()
+        
 
     def refreshUiMode(self):
       self._ui_confirm='unkn'
@@ -1139,12 +1148,35 @@ class Gui(object ):
                   rotObj['mpos'] = self._current_template_idx
                   rotObj['rotary_on_mpos'] = value 
                   updated=True
-                elif rotObj['axe'].find('.') >=0 and self._ui_modes[self._ui_mode] in ('template') :
-                   if self.grblParserObj.template.params is not None:
-                      param=rotObj['axe'][rotObj['axe'].find('.')+1:]
-                      if param in self.grblParserObj.template.params:
-                         rotObj['mpos'] = self.grblParserObj.template.params.get(param,0)
-                         rotObj['rotary_on_mpos'] = value 
+                elif rotObj['axe'].find('.') >=0 :
+                  params=self.grblParserObj.template.params if self._ui_modes[self._ui_mode] in ('template') else self.grblParserObj._cnc_params
+                  if params is not None:
+                    param=rotObj['axe'][rotObj['axe'].find('.')+1:]
+                    param_val=self.get_param_by_index( params,param)
+                    if param_val is not None:
+                      try:
+                        if isinstance(param_val, (list, tuple)):
+                           v=param_val[1]
+                           isFloat=param_val[1].find('.')>=0
+                           if isFloat:
+                              rotObj['mpos'] = float(v)
+                           else:
+                              rotObj['mpos'] = int(v)
+                        elif isinstance(param_val, (int , float)):    
+                            rotObj['mpos'] = param_val   
+                        elif isinstance(param_val, (str)):    
+                              v=param_val
+                              isFloat=v.find('.')>=0
+                              if isFloat:
+                                rotObj['mpos'] = float(v)
+                              else:
+                                rotObj['mpos'] = int(v) 
+                      except ValueError:
+                              rotObj['mpos'] = 0
+                    else: 
+                       rotObj['mpos'] = 0        
+                    rotObj['rotary_on_mpos'] = value
+                    updated=True  
             if not updated:
                continue    
              
@@ -1325,7 +1357,19 @@ class Gui(object ):
           self.upd_rotary_on_mpg(rotN)
 
 
-
+    def get_param_by_index(self,params,param_name:str):
+        if isinstance(params, dict) :
+          if param_name in params:    
+            return params[param_name]
+        elif isinstance(params, (list, tuple)) :
+            index=-1
+            for i in range(len(params)):  
+                if params[i][0]==param_name or (param_name.startswith('$') and '$$.'+params[i][0]== param_name ) :
+                    index=i
+                    break
+            if index>=0 and len(params[index])>=2:
+               return params[index]
+        return None
 
 
     def upd_rotary_on_drive(self,rotN:int):
@@ -1367,30 +1411,30 @@ class Gui(object ):
             return
         elif self.rotaryObj[rotN]['axe'].find('.') >=0:
           param=self.rotaryObj[rotN]['axe'][self.rotaryObj[rotN]['axe'].find('.')+1:]
-          scale=1.0
-          val=None
-          if isinstance(params, dict):  
-            val=params[param]+delta_val*scale
-            params[param]=val
-          elif isinstance(params, (list, tuple)) :
-            index=-1
-            for i in range(len(params)):  
-                if params[i][0]==param:
-                    index=i
-                    break
-            if index>=0 and len(params[index])>=2:    
-              v=params[index][1]
-              if len(v)-v.find('0')-1>=2 and float(v)<10.0:
+          param_val=self.get_param_by_index(params,param)
+          if param_val is not None:
+            scale=1.0
+            val=None
+            if isinstance(param_val, (list, tuple)):
+              v=param_val[1]
+              isFloat=param_val[1].find('.')>=0
+              if isFloat:
+                if len(v)-v.find('.')-1>=2 and float(v)<10.0:
                     scale=0.01
-              elif len(v)-v.find('0')-1>=1:
+                elif len(v)-v.find('.')-1>=1:
                     scale=0.1
-
-              val=float(v)+delta_val*scale
-              params[index][1]=str(val)
-          if val is not None:
-            self.initRotaryStart() 
-            self.templ_labels[self.rotaryObj[rotN]['axe']].text=('{0:.2f}' if scale <0.1 else '{0:.1f}').format(val)
-            self.neoDraw(self.rotaryObj[rotN]['axe'], labels=self.templ_labels)
+                val=float(v)+delta_val*scale
+              else:
+                val=int(v)+int(delta_val*scale)
+              param_val[1]=str(val)
+              print('update param',param,' to ',param_val[1], param)  
+            else:
+              val= param_val+delta_val*scale 
+              params[param]=val
+            if val is not None:
+              self.initRotaryStart() 
+              self.templ_labels[self.rotaryObj[rotN]['axe']].text=('{0:.2f}' if scale <0.1 else '{0:.1f}').format(val)
+              self.neoDraw(self.rotaryObj[rotN]['axe'], labels=self.templ_labels)
                         
 
 

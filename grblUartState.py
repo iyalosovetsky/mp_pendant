@@ -876,7 +876,7 @@ class GrblState(object):
                   self.send2grblOne('zero'+self.gui.rotaryObj[0]['axe'].upper())
                   return 0
             elif l_buttonEvent[2]==1: #normal
-              print('button_yellow_callback now',self.gui._ui_modes[self.gui._ui_mode],'prev=',self.gui._ui_modes[self.gui._ui_mode_prev],'hl=',l_buttonEvent[3],l_buttonEvent)
+              #print('button_yellow_callback now',self.gui._ui_modes[self.gui._ui_mode],'prev=',self.gui._ui_modes[self.gui._ui_mode_prev],'hl=',l_buttonEvent[3],l_buttonEvent)
               # if l_buttonEvent[3] in ('zeroX','zeroY','zeroZ') and self.gui._ui_modes[self.gui._ui_mode] in ( 'main','confirm'):
               #   self.send2grblOne(l_buttonEvent[3])
               #   return 0
@@ -884,7 +884,10 @@ class GrblState(object):
               #   self.send2grblOne(l_buttonEvent[3])
               #   return 0
               if self.gui._ui_modes[self.gui._ui_mode]=='params' :
-                  print('point203: todo put params to grbl',l_buttonEvent)
+                  #print('point203: todo put params to grbl',l_buttonEvent)
+                  cmd=l_buttonEvent[3][l_buttonEvent[3].find('.')+1:]+'='+l_buttonEvent[4][:l_buttonEvent[4].find('.')+4]
+                  self.send2grbl(cmd)
+                  
                   self.queryParams()               
               elif self.gui._ui_modes[self.gui._ui_mode] == 'confirm':
                 self._ui_confirm='yes'
