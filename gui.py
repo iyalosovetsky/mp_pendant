@@ -1067,6 +1067,7 @@ class Gui(object ):
           self.neoHighLight(id= 'x',labels=self.labels) # default highlight x coordinate in main and drive modes
       elif self._ui_modes[self._ui_mode] in ('template','params'):
         self.neoIcon(text=self._ui_modes[self._ui_mode]) 
+        self._current_template_idx=0
         self.neoHighLight(id='term',labels=self.labels)
         if self._ui_modes[self._ui_mode] in ('params'):
           self.grblParserObj.queryParams()
@@ -1432,6 +1433,7 @@ class Gui(object ):
               val= param_val+delta_val*scale 
               params[param]=val
             if val is not None:
+              print('res update params=',params,' param= ',param,' val ',val)  
               self.initRotaryStart() 
               self.templ_labels[self.rotaryObj[rotN]['axe']].text=('{0:.2f}' if scale <0.1 else '{0:.1f}').format(val)
               self.neoDraw(self.rotaryObj[rotN]['axe'], labels=self.templ_labels)

@@ -913,7 +913,7 @@ class GrblState(object):
                   #newParams=self.template.params
                   #print('button_yellow_callback2222: newParams=',newParams) 
                   ii=0
-                  self.gui._ui_mode=0 #main mode after confirm template
+                  self.gui._ui_mode=1 #drive mode after confirm template
                   self.gui.refreshUiMode()
                   for cmd in cmds:
                           self.send2grbl(cmd) #todo unmark after develop
