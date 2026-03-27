@@ -1,4 +1,9 @@
+import usocket as socket
+import uselect as select
+import sys
+
 import time
+
 
 
 from nanoguilib.writer import CWriter
@@ -17,6 +22,8 @@ from machine import  Pin
 from button import Button
 from ns2009 import Touch
 from array import array
+from template import Template
+
 
 
 Y_POS_LABEL_PARAMS=280
@@ -95,6 +102,7 @@ GRBL_QUERY_INTERVAL_RUN = 500000000  # 0.5s in nanoseconds
 MAX_BUTTON_BUFFER_SIZE=20
 
 BLANK_SCREEN_MS = 3600_000  # 3660s -> 1 hour
+
 
 
 
@@ -201,13 +209,11 @@ class Gui(object ):
     _blank=False
     _touched=time.ticks_ms()
     
-    def set_yellowButton(self,pin:int):
-       self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
-       self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
 
     debug:bool = DEBUG
     enable_invert_on_select = True
     templ_files = []
+    template = None
     labels = {}  # dictionary of configured messages_labels
     templ_labels = {}  # dictionary to store params of template macro
     _msg_conf = [ #name, textline, fgcolor, x, y, scale, width, nlines,align
@@ -224,10 +230,11 @@ class Gui(object ):
             ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  142+10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
             ('cmd', '#G29 some command grbl'      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
             ('feed', '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
-            ('state', 'Initial'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
-            ('mpg', 'noMPG G57'    , 'white'         ,  220,  0,  2, 310-120,1, ALIGN_RIGHT),
+            ('state', 'Idle'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
+            ('mpg', 'noMPG G57'    , 'white'         ,  180,  0,  2, 310-120,1, ALIGN_RIGHT),
             ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
             ('spindeOn', 'ON'           ,  'green'       ,   10, 370,  3, 60     ,1, ALIGN_LEFT),
+            ('home', 'HOME'           ,  'yellow'        ,  110, 370,  3, 60     ,1, ALIGN_CENTER),
             ('spindeOff', 'OFF'           ,  'red'        ,  250, 370,  3, 60     ,1, ALIGN_RIGHT),
             ('info', 'info'                        , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
             ('<', '<<'           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
@@ -277,6 +284,10 @@ class Gui(object ):
     _xToolPrev=None 
     _yToolPrev=None
 
+    ip = None
+    server = None
+    poller = None
+
 
 
 
@@ -317,18 +328,95 @@ class Gui(object ):
        self.neoBlank(time.ticks_diff(time.ticks_ms(),self._touched)>BLANK_SCREEN_MS)
        refresh(self.neo)
 
-    def set_redButton(self,pin:int):
+    def setYellowButton(self,pin:int):
        self.pin_yellow=Pin(pin, Pin.IN, Pin.PULL_UP)
        self.button_yellow=Button(pin=self.pin_yellow,callback=self.button_red_callback,callback_long=self.button_red_callback_long)
 
-    def set_yellowButton(self,pin:int):
+    def setRedButton(self,pin:int):
        self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
        self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
 
     def button_red_callback(self,pin,button): # right key
-       self.pushButtons(btnN=1,state=1)
+      print('Red button pressed')
+      if self._ui_modes[self._ui_mode] == 'confirm': # for approve confirm dialog
+        self.procButtons([0,1,1, self._highlightedArea ])
+      else:
+        self.pushButtons(btnN=1,state=1)
 
-           
+
+    # --- 2. HTTP Server Setup ---
+    def start_http(self,ip):
+        # Bind to port 80 (HTTP)
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #self.http_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        host = '0.0.0.0'
+        port = 8080
+        self.server.bind((host, port))
+        self.server.listen(5)
+        self.server.setblocking(False) # Set to non-blocking mode
+        # Реєстрація сокета для опитування на подію POLLIN (вхідні дані/підключення)
+
+        self.poller = select.poll()
+        self.poller.register(self.server, select.POLLIN)
+        print(f"Listening on {host}:{port}")
+
+        
+
+
+
+
+
+
+    def httpTask(self):
+      if self.server is None:
+        return
+
+      events = self.poller.poll(100)
+      
+      for fd, ev in events:
+          if ev & select.POLLIN:
+              # Маємо нове підключення
+            try:  
+              conn, addr = self.server.accept()
+              print('Client connected from', addr)
+              conn.setblocking(False)
+
+              # Read the request
+              request = conn.recv(1024)
+              print("Request received:", request)
+              
+              # --- 3. Process POST request ---
+              if "POST /post" in request:
+                  # Find body part (separated by \r\n\r\n)
+                  parts = request.split('\r\n\r\n')
+                  if len(parts) > 1:
+                      body = parts[1]
+                      print("POST Data Received:", body)
+                      
+                      # Example of acting on data: JSON parsing
+                      # data = json.loads(body)
+                      
+                      # Send HTTP Response (OK)
+                      response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
+                      response += '{"status": "success"}'
+                      conn.send(response)
+                  else:
+                      conn.send("HTTP/1.1 400 Bad Request\r\n\r\n")
+              else:
+                  # Basic home page for GET request
+                  conn.send("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
+                  conn.send("<h1>MicroPython POST Server</h1>")
+
+              conn.close()
+            except OSError as e:
+                    conn.close()
+                    print('Connection closed')
+        
+        
+        
+
+
+
              
 
     def button_red_callback_long(self,pin,button):
@@ -336,22 +424,168 @@ class Gui(object ):
         
  
     def button_yellow_callback(self,pin,button):
-       self.pushButtons(btnN=0,state=1)
+      print('Yellow button pressed')
+      if self._ui_modes[self._ui_mode] == 'confirm': # for approve confirm dialog
+        self.procButtons([0,0,1, self._highlightedArea ])
+      else:
+        self.pushButtons(btnN=0,state=1)
 
 
     def button_yellow_callback_long(self,pin ,button):
         self.pushButtons(btnN=0,state=2)
 
 
+
+    def initTemplate(self):
+      self.template=Template(template_name=self.templ_files[self._current_template_idx])
+      if self.template is not None and self.template.app is not None :  
+          
+          ii=0
+          cmds=self.template.app.getGcode()
+          if isinstance(cmds,str):
+            print('button_yellow_callback: template mode, string mode template=',cmds)
+            cmds=cmds.splitlines()
+          else:
+            print('button_yellow_callback: template mode, list mode  template=',cmds)
+
+
+
+
+
+          for cmd in cmds:
+              #self.grblParserObj.send2grbl(cmd) todo unmark after develop
+              ii+=1
+              #if ii==1:
+              #   print('point11',cmd) 
+          print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
+          self.neoDisplayTemplate(template_name =self.template.template_name)
+
+
+    def procButtons(self,buttonEvent):
+          if buttonEvent[1]==0: #yellow
+            if buttonEvent[2]==2: #long
+              print('button_yellow_callback_long')
+              if self.grblParserObj._grblExecProgress in ('do','doing','alarm','error'):
+                  print ('button_yellow_callback_long: skip on _grblExecProgress=',self.grblParserObj._grblExecProgress)
+                  return 1       
+              if self._ui_modes[self._ui_mode] in ( 'main'):
+                if self.rotaryObj[0]['axe'] in ('x','y','z'):
+                  self.grblParserObj.send2grblOne('zero'+self.rotaryObj[0]['axe'].upper())
+                  return 0
+            elif buttonEvent[2]==1: #normal
+              if self._ui_modes[self._ui_mode]=='params' and len(buttonEvent)>=5 and buttonEvent[3] is not None and buttonEvent[4] is not None:
+                  #print('point203: todo put params to grbl',l_buttonEvent)
+                  cmd=buttonEvent[3][buttonEvent[3].find('.')+1:]+'='+buttonEvent[4][:buttonEvent[4].find('.')+4]
+                  self.grblParserObj.send2grbl(cmd)
+                  self.grblParserObj.queryParams()               
+              elif self._ui_modes[self._ui_mode] == 'confirm':
+                self._ui_confirm='yes'
+                self._ui_mode= self._ui_mode_prev
+                #print('button_yellow_callback222: confirm mode, self._ui_confirm_prev=',self._ui_modes[self._ui_mode])
+                
+                if buttonEvent[3] in ('zeroX','zeroY','zeroZ') and len(buttonEvent)>=4 and buttonEvent[3] is not None:
+                  self.grblParserObj.send2grblOne(buttonEvent[3])
+                  #self.nextUiMode(to_mode=self._ui_mode_prev, refresh=True)
+                  self.leave2PrevAfterConfirm(self._ui_mode_prev)
+                elif buttonEvent[3] in ('spindeOn','spindeOff', 'home') and len(buttonEvent)>=4 and buttonEvent[3] is not None:
+                  self.grblParserObj.send2grblOne(buttonEvent[3])
+                  self.leave2PrevAfterConfirm(self._ui_mode_prev)
+                elif self._ui_modes[self._ui_mode]=='template' and self.template is not None:
+                  self.template.updateParams()
+                  cmds=self.template.app.getGcode()
+                  if isinstance(cmds,str):
+                        #print('button_yellow_callback222: template mode, string mode template=',cmds)
+                        cmds=cmds.splitlines()
+                  else:
+                        print('button_yellow_callback2222: template mode, list mode  template=',cmds)
+                  #newParams=self.template.params
+                  #print('button_yellow_callback2222: newParams=',newParams) 
+                  ii=0
+                  self._ui_mode=1 #drive mode after confirm template
+                  #self.nextUiMode(to_mode=1, refresh=True)
+                  self.leave2PrevAfterConfirm(to_mode=1)
+
+                  for cmd in cmds:
+                          self.grblParserObj.send2grbl(cmd) #todo unmark after develop
+                          ii+=1
+                          if ii==1:
+                            print('point11',cmd) 
+                  print('len 2send2222',len(self.grblParserObj.grblCmd2send),ii,self.template.params)
+                  
+                      
+
+
+
+              else:
+                if self._ui_modes[self._ui_mode] == 'drive' \
+                  and (self.grblParams._dX2go!=0 or self.grblParams._dY2go!=0 or self.grblParams._dZ2go!=0):
+                  cmd='G91 G1'
+                  if self.grblParams._dX2go!=0:
+                    cmd+=' X{0:.3f}'.format(self.grblParams._dX2go)
+                  if self.grblParams._dY2go!=0:
+                    cmd+=' Y{0:.3f}'.format(self.grblParams._dY2go)
+                  if self.grblParams._dZ2go!=0:
+                    cmd+=' Z{0:.3f}'.format(self.grblParams._dZ2go)
+                  if self._feedrateRun>0:
+                    cmd+=' F{0:.0f}'.format(self._feedrateRun)
+                  else:
+                    cmd+=' F{0:.0f}'.format(50)  
+                  
+                  self.grblParserObj.mpgCommandShow(cmd)
+                  self.grblParams._dX2go=0.00
+                  self.grblParams._dY2go=0.00
+                  self.grblParams._dZ2go=0.00
+                elif self._ui_modes[self._ui_mode] == 'template':
+                  print('button_yellow_callback: template mode, ',self._current_template_idx)
+                  if self._current_template_idx is not None and self._current_template_idx>=0 and self._current_template_idx<len(self.templ_files):
+                      self.initTemplate()
+
+
+
+
+                else:  
+                    #self.nextUiMode(-1) 
+                    print('button_yellow_callback no switch mode')
+
+
+
+
+
+
+          elif buttonEvent[1]==1: #red
+            if buttonEvent[2]==2: #long
+              print('button_red_callback_long')
+              return 0
+            elif buttonEvent[2]==1: #normal
+              print('button_red_callback  self.grblParserObj._grblExecProgress=', self.grblParserObj._grblExecProgress, self.grblParams._state)
+              if self.grblParserObj._grblExecProgress in ('do','doing','alarm','error') or self.grblParams._state in ('alarm','error') :
+                self.grblParserObj.send2grblOne('cancel')
+                self.grblParserObj.send2grblOne('^')
+                #machine.soft_reset()
+                return 0
+              else:  
+                if self._ui_modes[self._ui_mode] == 'confirm':
+                  self._ui_confirm='no'
+                  #self.nextUiMode(to_mode=self._ui_mode_prev, refresh=True)
+                  self.leave2PrevAfterConfirm(self._ui_mode_prev)
+                else:
+                  #self.nextUiMode(1)                
+                  print('button_red_callback no switch mode')
+
+                return 0  
+          return 0  
+
+
     def pushButtons(self,btnN,state):
        self._touched=time.ticks_ms()
+       self.neoBlank(False)
        while len(self.grblButtonHist)>MAX_BUTTON_BUFFER_SIZE:
           self.grblButtonHist.pop(0)
-       print('point200:',self._highlightedArea,btnN,state)   
+       #print('point200:',self._highlightedArea,btnN,state)   
        if self._current_template_idx>=0 and self._highlightedArea.startswith('$$') :
-          print('point201: axe, param [idx] ',self._highlightedArea,self.rotaryObj[0]['axe'],self.grblParserObj._cnc_params[self._current_template_idx])
+          #print('point201: axe, param [idx] ',self._highlightedArea,self.rotaryObj[0]['axe'],self.grblParserObj._cnc_params[self._current_template_idx])
           ff=self.grblParserObj._cnc_params[self._current_template_idx]
-          print('point202: ff ',ff)
+          #print('point202: ff ',ff)
           self.grblButtonHist.append([self.buttonInCounter,btnN,state, '$$.' + ff[0],ff[1]] )            
        else:   
           self.grblButtonHist.append([self.buttonInCounter,btnN,state, self._highlightedArea ] )            
@@ -360,7 +594,9 @@ class Gui(object ):
        if self._blank!=blank or self.neo._blank!=blank:
         self._blank=blank
         self.neo._blank=self._blank
-        print("neoBlank:",self._blank)
+        if not self._blank:
+           self.neo_refresh= True
+        #print("neoBlank:",self._blank)
 
     def toolMapX(self,x):
        if x is None:
@@ -430,10 +666,12 @@ class Gui(object ):
     def neoInit(self):
        self.labels=self.neoDrawAreas(self._msg_conf)
        self.neoHighLight(id=self._highlightedArea, labels=self.labels)
+       
        self.neo_refresh= True
        self.templ_labels = {}  # dictionary of configured messages_labels
        self.show_MPG()
        self.neoGrid()
+       self.refreshUiMode()
                  
     # initialize neo display labels
     def neoDrawAreas(self, config_array=[]):
@@ -476,7 +714,7 @@ class Gui(object ):
             elif name in ('zeroX','zeroY','zeroZ'):
               ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
-            elif name in ('spindeOn','spindeOff'):
+            elif name in ('spindeOn','spindeOff','home'):
               ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
               labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
             elif name in ('mx','my','mz'):
@@ -894,7 +1132,10 @@ class Gui(object ):
     def show_MPG(self): 
        self.grblParserObj._wcs_changed=False
        self.grblParserObj._mpg_changed=False
-       self.neoLabel( ('MPG' if self.grblParams._mpg=='1' else 'noMPG')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ') ,id='mpg')
+       self.neoLabel( ('MPG' if self.grblParams._mpg=='1' else 'noMPG') + \
+                     (' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ') + \
+                     (' '+self.grblParams._pn if self.grblParams._pn is not None else  '    ')
+                       ,id='mpg')
 
     def displayState(self,DisplayInfoLen=0):     
       if  self._ui_modes[self._ui_mode] in ('template','params'):
@@ -983,7 +1224,7 @@ class Gui(object ):
     def touchscreen_press(self,x, y):
         # print('touchscreen_press:',x,y) 
         self._touched=time.ticks_ms() # lastotuched
-
+        self.neoBlank(False)
         self._highlightedArea=''
         self._pressedOldX = self._pressedX
         self._pressedOldY = self._pressedY  
@@ -994,7 +1235,7 @@ class Gui(object ):
         for label in self.labels:
             if ((self._ui_modes[self._ui_mode] in ('template','params') and  label in ('<','>','term')) \
                 
-              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed','mpg','zeroX','zeroY','zeroZ','spindeOn','spindeOff')) ) \
+              or (self._ui_modes[self._ui_mode] in ('main','drive') and  label in ('x','y','z','<','>','dXY','dZ','feed','mpg','zeroX','zeroY','zeroZ','spindeOn','spindeOff','home')) ) \
               or  label in ('icon','term') \
                 and not self.labels[label].hidden:
                 if x>=self.labels[label].x-2 and x<=self.labels[label].x+self.labels[label].width+2 \
@@ -1006,7 +1247,7 @@ class Gui(object ):
         if self._highlightedArea!='':
           print('  pressed ',self._highlightedArea)
           self.neoHighLight(id=self._highlightedArea,labels=self.labels)
-          if self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff') and self._ui_modes[self._ui_mode] in ('main','drive'):
+          if self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff','home') and self._ui_modes[self._ui_mode] in ('main','drive'):
             self._ui_confirm='OK'
             self.enterConfirmMode()
             self.neoIcon(text=self._ui_modes[self._ui_mode])
@@ -1048,7 +1289,7 @@ class Gui(object ):
       if self._ui_modes[self._ui_mode] in ('main','drive'):
         self.neoGrid()
         self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
-        if self.rotaryObj[0]['axe']!='icon' and not self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff'):
+        if self.rotaryObj[0]['axe']!='icon' and not self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff','home'):
           self.rotaryObj[0]['axe']='x'
         self.neoIcon(text=self._ui_modes[self._ui_mode])
         self.grblParams._dX2go=0.0
@@ -1076,26 +1317,42 @@ class Gui(object ):
         self.neoLabel('','info',hidden=True, force=True)
 
 
-    def nextUiMode(self, direction=None):
+     
+
+    def nextUiMode(self, direction=None, to_mode=None, refresh=True):
+        print('nextUiMode:',direction,'to:',to_mode,self._ui_modes[to_mode]if to_mode is not None else None,'prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
         oldUiMode=self._ui_mode
+        newMode = self._ui_mode
         if direction is not None :
-          self._ui_mode+=direction
-        if direction is None: # enter in confirm mode
-          self._ui_mode_prev=self._ui_mode
-          self._ui_mode = len(self._ui_modes)-1 # 'confirm' mode, last element    
-        elif self._ui_mode<0:
-          self._ui_mode=len(self._ui_modes)-2
-        elif self._ui_mode>=len(self._ui_modes)-1 or self._ui_modes[self._ui_mode]=='confirm':
-          self._ui_mode=0
-        if oldUiMode!=self._ui_mode:  
+          newMode+=direction
+        elif to_mode is not None :
+            newMode=to_mode
+        if direction is None and to_mode is None: # enter in confirm mode
+          newMode = len(self._ui_modes)-1 # 'confirm' mode, last element    
+        elif newMode<0:
+          newMode=len(self._ui_modes)-2
+        elif newMode>=len(self._ui_modes)-1:
+          newMode=0
+        print('nextUiMode: [3]','new:',newMode,self._ui_modes[newMode]  ,'prev:',oldUiMode,self._ui_modes[oldUiMode])
+        if oldUiMode!=newMode or refresh:
+          print('nextUiMode: [4]','new:',newMode,self._ui_modes[newMode] if newMode is not None else None,'prev:',oldUiMode,self._ui_modes[oldUiMode])
+          if oldUiMode is not None and self._ui_modes[oldUiMode] not in ('confirm') and oldUiMode!=newMode:
+            self._ui_mode_prev=oldUiMode  
+          print('nextUiMode:[res]','prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
+          self._ui_mode=newMode
+          print('nextUiMode:[res]','new:',self._ui_mode,self._ui_modes[self._ui_mode])
           self.refreshUiMode()
 
         
 
 
 
-    def enterConfirmMode(self):
-       self.nextUiMode(direction=None) # enter in confirm mode
+    def enterConfirmMode(self, to_mode=None, refresh=True ) :
+       self.nextUiMode(direction=None,to_mode=to_mode, refresh=refresh) # enter in confirm mode
+
+
+    def leave2PrevAfterConfirm(self, to_mode) :
+       self.nextUiMode(direction=None,to_mode=to_mode, refresh=True) # enter in confirm mode
 
 
     def getConfirm(self):
@@ -1204,6 +1461,7 @@ class Gui(object ):
 
     def rotary_listener(self,rotN):
         self._touched=time.ticks_ms()
+        self.neoBlank(False)
         if self.rotaryObj[rotN]['obj'] is not None:
             self.rotaryObj[rotN]['value_prev']=self.rotaryObj[rotN]['value']
             self.rotaryObj[rotN]['value']=self.rotaryObj[rotN]['obj'].value()

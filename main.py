@@ -6,19 +6,36 @@ import sys
 from nanoguilib.color_setup import ssd
 from nanoguilib.nanogui import refresh
 from TermReader import TermReader
-#from ns2009 import Touch
-#from button import Button
 
+
+import network
+import socket
+import json
 
 
 
 
 print(machine.freq()) 
 # Set CPU to 300 MHz
-machine.freq(300000000)
+#machine.freq(300000000)
+machine.freq(240000000) # for wifi stability, 240 MHz is more stable than 300 MHz on ESP32-S3
 # Verify the new frequency
 print(machine.freq()) 
 
+# --- 1. WiFi Connection Setup ---
+def connect_wifi(ssid, password):
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        print('Connecting to WiFi...')
+        wlan.connect(ssid, password)
+        while not wlan.isconnected():
+            pass
+    print('WiFi Connected:', wlan.ifconfig())
+    return wlan.ifconfig()[0]
+
+
+ip = connect_wifi('IGORNET', 'IG0RNET29041971') 
 
 
 # Initialize UART (adjust parameters for your board/pins)
@@ -52,8 +69,8 @@ refresh(ssd, True)
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False, templateDir='/templates')
 st.gui.set_rotary_obj(rot0,0,'x',1.0)
-st.gui.set_redButton(17)
-st.gui.set_yellowButton(16)
+st.gui.setYellowButton(17)
+st.gui.setRedButton(16)
 
 rot0.add_listener(st.rotary_listener0)
 
@@ -76,7 +93,9 @@ print('touch initialized')
 #bt_red=Button(pin=p_yellow,callback=st.button_red_callback,callback_long=st.button_red_callback_long)
 #bt_yellow=Button(pin=p_red,callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
 
- 
+
+
+st.gui.start_http(ip)
 
 
 while True:
@@ -94,3 +113,8 @@ while True:
         
             
     time.sleep(0.05) # Small delay to prevent a hard loop
+
+
+
+
+
