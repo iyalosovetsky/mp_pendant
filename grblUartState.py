@@ -892,7 +892,7 @@ class GrblState(object):
     def popButtons(self):
         if len(self.gui.grblButtonHist)>0:
           l_buttonEvent=self.gui.grblButtonHist.pop(0)
-          return self.procButtons(l_buttonEvent)       
+          return self.gui.procButtons(l_buttonEvent)       
 
              
 

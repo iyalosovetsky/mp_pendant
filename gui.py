@@ -108,6 +108,24 @@ BLANK_SCREEN_MS = 3600_000  # 3660s -> 1 hour
 
 DEBUG= False
 
+
+# HTML сторінка з діалогом вибору файлу
+html_page = """HTTP/1.1 200 OK
+Content-Type: text/html
+
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>MicroPython Upload</title></head>
+<body>
+    <h2>Завантаження файлу на пристрій</h2>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Завантажити">
+    </form>
+</body>
+</html>
+"""
+
 class NeoLabelObj(object):
     def __init__(self, fgcolor:int , scale:float,x:int,y:int,text:str = '',label=None,fldLabel=None,
                  oneWidth:int=20, nlines:int=1, align = ALIGN_LEFT, bdcolor=None, invert=False, hidden = False,rotaryScale=1.0):
@@ -336,12 +354,6 @@ class Gui(object ):
        self.pin_red=Pin(pin, Pin.IN, Pin.PULL_UP)
        self.button_red=Button(pin=self.pin_red,callback=self.button_yellow_callback,callback_long=self.button_yellow_callback_long)
 
-    def button_red_callback(self,pin,button): # right key
-      print('Red button pressed')
-      if self._ui_modes[self._ui_mode] == 'confirm': # for approve confirm dialog
-        self.procButtons([0,1,1, self._highlightedArea ])
-      else:
-        self.pushButtons(btnN=1,state=1)
 
 
     # --- 2. HTTP Server Setup ---
@@ -361,7 +373,74 @@ class Gui(object ):
         print(f"Listening on {host}:{port}")
 
         
-
+    def save_clean_file(self, conn, filename= "uploaded2_file.py"):
+      try:
+          # 1. Читаємо перший шматок, щоб знайти межу (boundary) та кінець HTTP-заголовків
+          data = conn.recv(1024)
+          fn=None
+          lfilename=filename
+          # Шукаємо порожній рядок \r\n\r\n, який відділяє HTTP-заголовки від тіла
+          header_end = data.find(b'\r\n\r\n')
+          if header_end == -1: return None
+          #print("Header received,  :", data[:header_end])
+          for items in data[:header_end].split(b'\r\n'):
+              if b'Content-Disposition:' in items:
+                  #print("Content-Disposition found:", items)
+                  for items in data[:header_end].split(b';'):
+                      if b'filename=' in items:
+                          filename2 = items.split(b'filename=')[1].strip().strip(b'"').decode().replace('"','').strip()
+                          #print("Filename extracted:", filename2)
+                          if  filename2.find('.py') >=0 :
+                            lfilename = 't'+filename2[:filename2.find('.py')]+'.py' # add prefix and suffix to avoid executing uploaded file as template
+                            break
+                          else:
+                             print( filename2, filename2.find('/')   , filename2.find('\\')  )
+                  break
+          else:
+              print("filename2 not found in headers.")
+          
+          
+          print("Filename to save :", self.templateDir + "/" + lfilename,filename)
+          # Тіло запиту починається після \r\n\r\n
+          body_start = data[header_end+4:]
+          
+          # Шукаємо межу multipart (вона після Content-Type заголовків файлу)
+          file_start = body_start.find(b'\r\n\r\n')
+          #if file_start == -1: return False
+          if file_start == -1: 
+             actual_data = body_start
+          else:   
+            # Реальний вміст файлу починається тут
+            actual_data = body_start[file_start+4:]
+          ii=0
+          fn=self.templateDir + "/" + lfilename
+          with open(fn, "wb") as f:
+              f.write(actual_data)
+              ii+=1
+              # 2. Читаємо решту даних потоком
+              while True:
+                  ii+=1
+                  chunk = conn.recv(1024)
+                  if not chunk: break
+                  
+                  # Шукаємо фінальну межу (boundary)
+                  # Спрощення: якщо знаходимо '--', це зазвичай кінець форми
+                  boundary_pos = chunk.find(b'\r\n--')
+                  if boundary_pos != -1:
+                      f.write(chunk[:boundary_pos])
+                      break
+                  f.write(chunk)
+          
+          print("Файл очищено та збережено:", fn)
+          return fn
+      except Exception as e:
+          if ii>0:
+                print(f"Записано частково, байт: {ii*512} - ",fn, e)
+                return fn
+          else:
+              print("Помилка парсингу:", e)
+          return None
+      
 
 
 
@@ -378,30 +457,43 @@ class Gui(object ):
               # Маємо нове підключення
             try:  
               conn, addr = self.server.accept()
+              conn.setblocking(True) # Тимчасово блокуємо для стабільного читання заголовків
               print('Client connected from', addr)
-              conn.setblocking(False)
 
-              # Read the request
-              request = conn.recv(1024)
-              print("Request received:", request)
               
+              # Для завантаження файлів краще на мить перейти в блокуючий режим
+              conn.settimeout(5.0) 
+              request = conn.recv(1024).decode()
+              
+              print("Request received:", request)
+              if "GET / " in request:
+                    # Віддаємо головну сторінку з формою
+                    conn.send(html_page)
+                
               # --- 3. Process POST request ---
-              if "POST /post" in request:
+              elif "POST /upload" in request:
                   # Find body part (separated by \r\n\r\n)
-                  parts = request.split('\r\n\r\n')
-                  if len(parts) > 1:
-                      body = parts[1]
-                      print("POST Data Received:", body)
+                  fn=self.save_clean_file(conn)
+
+                  if fn is not None:
+                        conn.send("HTTP/1.1 200 OK\r\n\r\nFile Saved!"+fn)
+                  else:
+                        conn.send("HTTP/1.1 500 Error\r\n\r\nWrite Failed")                  
+                  # if len(parts) > 1:
+                      # body = parts[1]
+                      # print("POST Data Received:", len(body), "bytes")
                       
                       # Example of acting on data: JSON parsing
                       # data = json.loads(body)
                       
                       # Send HTTP Response (OK)
-                      response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
-                      response += '{"status": "success"}'
-                      conn.send(response)
-                  else:
-                      conn.send("HTTP/1.1 400 Bad Request\r\n\r\n")
+                      # response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
+                      # response += '{"status": "success"}'
+                      # conn.send(response)
+                      # conn.send("HTTP/1.1 200 OK\r\n\r\nFile received (simulated)")
+
+                  # else:
+                      # conn.send("HTTP/1.1 400 Bad Request\r\n\r\n")
               else:
                   # Basic home page for GET request
                   conn.send("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
@@ -411,12 +503,21 @@ class Gui(object ):
             except OSError as e:
                     conn.close()
                     print('Connection closed')
+            except Exception as e:
+              
+              conn.close()
+              print("інша помилка:", e)
         
         
         
 
 
 
+    def button_red_callback(self,pin,button): # right key
+      if self._ui_modes[self._ui_mode] == 'confirm': # for approve confirm dialog
+        self.procButtons([0,1,1, self._highlightedArea ])
+      else:
+        self.pushButtons(btnN=1,state=1)
              
 
     def button_red_callback_long(self,pin,button):
@@ -424,7 +525,6 @@ class Gui(object ):
         
  
     def button_yellow_callback(self,pin,button):
-      print('Yellow button pressed')
       if self._ui_modes[self._ui_mode] == 'confirm': # for approve confirm dialog
         self.procButtons([0,0,1, self._highlightedArea ])
       else:
