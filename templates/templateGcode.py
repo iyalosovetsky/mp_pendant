@@ -20,7 +20,7 @@ class TemplateGcode():
     def getInitGcode(self):
         cmd=[]
         cmd.append(';'+self.__shape__+': '+(','.join([nn  for nn in self.__slots__ if not nn.startswith('__')]))) # Set units to millimeters, select XY plane, use absolute positioning'
-        cmd.append('G21 G17 G90') # Set units to millimeters, select XY plane, use g91 relative positioning'
+        cmd.append('G21 G17 G90') # Set units to millimeters, select XY plane, use g91 relative positioning, use g90 absolute positioning'
         cmd.append('G10L20P1X0Y0Z0') # Set g54 to 0,0,0
         #cmd.append(f'G0 X0 Y0 F{self.feed}') # Rapid move to the start position (0,0) with a feed rate of 500mm/min
         cmd.append('M3') # Turn on the spindle (or laser), adjust speed (S value) as needed
@@ -40,14 +40,16 @@ class TemplateGcode():
 
     def getGcode(self):
         cmd=self.getInitGcode()
+        cmdOrigin = self.getOriginGcode()
         cmdOne = self.getOneLayerGcode()
         cmdDown = self.getDzGcode()
+        cmd.extend(cmdOrigin)
         cmd.extend(cmdOne)
         pos = self.down
         while pos >= 0:
             pos -= self.dz
             self.__z = pos-self.down
-            
+            cmd.extend(cmdOrigin)
             cmd.extend([ll.format(z=self.__z,zfeed=self.zfeed) for ll in cmdDown])
             cmd.extend(cmdOne)
         cmd.extend(self.getEndGcode())    

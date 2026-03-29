@@ -23,6 +23,12 @@ class App(TemplateGcode):
         return [{"name": self.__shape__, "shape": "ellipse", "x": self.diameter/2, "y": self.diameter/2, "width": self.diameter, "height": self.diameter, "fill": True, "color": "green"},
                 {"name": "origin", "shape": "origin", "x": self.diameter/2, "y": self.diameter/2, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
+    def getOriginGcode(self):
+        delta=self.toolDiameter/2
+        x0=delta
+        y0=delta
+        return f'G1 X{x0} Y{y0} F{self.feed}'.splitlines()
+
 
     def getOneLayerGcode(self):
         return f'G02 X0 Y0 I{self.diameter/2} J0 F{self.feed}'.splitlines() # Clockwise arc back to the start point (X0 Y0) with I offset 10 (center is at X10)

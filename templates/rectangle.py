@@ -20,7 +20,11 @@ class App(TemplateGcode):
         return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.height, "fill": True, "color": "yellow"},
                 {"name": "origin", "shape": "origin", "x": 0, "y": 0, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
-    
+    def getOriginGcode(self):
+        delta=self.toolDiameter/2
+        x0=delta
+        y0=delta
+        return f'G1 X{x0} Y{y0} F{self.feed}'.splitlines()    
 
     def getOneLayerGcode(self):
         return f'G1 X{self.width} Y0 F{self.feed} \nG1 X{self.width} Y{self.height}\nG1 X0 Y{self.height}\nG1 X0 Y0'.splitlines()
