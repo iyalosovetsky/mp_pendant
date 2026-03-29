@@ -650,9 +650,14 @@ class Gui(object ):
                   self.grblParams._dY2go=0.00
                   self.grblParams._dZ2go=0.00
                 elif self._ui_modes[self._ui_mode] == 'template':
-                  print('button_yellow_callback: template mode, ',self._current_template_idx)
+                  print('button_yellow_callback:[2] ',self._highlightedArea,self._current_template_idx)
                   if self._current_template_idx is not None and self._current_template_idx>=0 and self._current_template_idx<len(self.templ_files):
-                      self.initTemplate()
+                      if self._highlightedArea is not None and self._highlightedArea.find('.')>=0:
+                        print('procButtons: point1 need param update')
+                        self.template.updateParams()
+                        self.neoTemplateImage()
+                      else:
+                        self.initTemplate()
 
 
 

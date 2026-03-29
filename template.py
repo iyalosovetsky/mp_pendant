@@ -76,6 +76,7 @@ class Template:
              
 
     def updateParams(self):
+        print('updateParams: need param update',loaded_app,self.params)
         if loaded_app is None:
             return
         print('Template.updateParams: update params with ',self.params)
