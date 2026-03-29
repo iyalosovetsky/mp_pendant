@@ -1,8 +1,8 @@
 import time
 import machine
 from machine import UART
-from gui import Gui, VFD_YELLOW, VFD_LBLUE,VFD_WHITE
-from nanoguilib.label import ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER 
+from gui import Gui
+
 
 class GrblParams:
     """

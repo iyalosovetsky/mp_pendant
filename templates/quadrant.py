@@ -16,7 +16,8 @@ class App(TemplateGcode):
         self.__z:float = 0.0
     
     def getIcon(self):
-        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.width, "fill": True, "color": "red"}]
+        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.width, "fill": True, "color": "red"},
+                {"name": "origin", "shape": "origin", "x": 0, "y": 0, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
     
 

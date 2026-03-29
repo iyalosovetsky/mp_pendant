@@ -30,13 +30,13 @@ Y_POS_LABEL_PARAMS=280
 PARAMS_IN_ROW=3
 PARAMS_IN_COL=3
 
-VFD0_PURPLE = 0x00FFD2
-VFD0_GREEN = 0x30BF30
-VFD0_RED = 0xCF3030
-VFD0_BLUE = 0x4040CF
-VFD0_YELLOW = 0xFFFF00
-VFD0_YELLOW2 = 0xBFBF00
-VFD0_WHITE = 0xCFCFCF
+#VFD0_PURPLE = 0x00FFD2
+#VFD0_GREEN = 0x30BF30
+#VFD0_RED = 0xCF3030
+#VFD0_BLUE = 0x4040CF
+#VFD0_YELLOW = 0xFFFF00
+#VFD0_YELLOW2 = 0xBFBF00
+#VFD0_WHITE = 0xCFCFCF
 
 # VFD_GRAY = 0x0016 #0x0019 0x001A 0x0006 0x0009
 # VFD_PURPLE = 0x0017 #0x0007
@@ -49,29 +49,29 @@ VFD0_WHITE = 0xCFCFCF
 # VFD_WHITE = 0xffff
 # VFD_BLACK = 0x0000
 
-VFD_GRAY = GREY #0x0019 0x001A 0x0006 0x0009
-VFD_PURPLE = MAGENTA #0x0007
-VFD_GREEN = GREEN #0x0001 0x0021
-VFD_RED = RED
-VFD_LBLUE = CYAN #0x0018
-VFD_BLUE = BLUE #0x0014
-VFD_YELLOW = YELLOW #0x0015 ssd.rgb(0xFF,0xff,0x00)
-VFD_YELLOW2 = VFD_YELLOW
-VFD_WHITE = WHITE
-VFD_BLACK = BLACK
+# VFD_GRAY = GREY #0x0019 0x001A 0x0006 0x0009
+# VFD_PURPLE = MAGENTA #0x0007
+#VFD_GREEN = GREEN #0x0001 0x0021
+#VFD_RED = RED
+#VFD_LBLUE = CYAN #0x0018
+#VFD_BLUE = BLUE #0x0014
+#VFD_YELLOW = YELLOW #0x0015 ssd.rgb(0xFF,0xff,0x00)
+#VFD_YELLOW2 = VFD_YELLOW
+#VFD_WHITE = WHITE
+#VFD_BLACK = BLACK
 
 
 
 
 
 
-VFD_ARROW_X = VFD_RED
-VFD_ARROW_Y = VFD_GREEN
-VFD_ARROW_Z = VFD_BLUE
-VFD_LABEL_X = VFD_WHITE
-VFD_LABEL_Y = VFD_WHITE
-VFD_LABEL_Z = VFD_WHITE
-VFD_BG = VFD_BLACK
+VFD_ARROW_X = RED
+VFD_ARROW_Y = GREEN
+VFD_ARROW_Z = BLUE
+VFD_LABEL_X = WHITE
+VFD_LABEL_Y = WHITE
+VFD_LABEL_Z = WHITE
+VFD_BG = BLACK
 
 X_ARROW_COLOR = 'red'
 Y_ARROW_COLOR = 'green'
@@ -166,21 +166,32 @@ class NeoLabelObj(object):
 def color2rgb(color:str):
     if color is not None and isinstance(color,str):
         if color.lower() == 'red':
-          color = VFD_RED
+          color = RED
         elif color.lower() == 'green':   
-          color = VFD_GREEN
+          color = GREEN
         elif color.lower() == 'blue':   
-          color = VFD_BLUE
-        elif color.lower() == 'lblue':   
-          color = VFD_LBLUE
-        elif color.lower() == 'purple':   
-          color = VFD_PURPLE      
+          color = BLUE
+        elif color.lower() in ('lblue', 'lightblue','cyan'):   
+          color = CYAN
+        elif color.lower() == 'magenta':   
+          color = MAGENTA      
         elif color.lower() == 'yellow':   
-          color = VFD_YELLOW      
+          color = YELLOW      
         elif color.lower() == 'white':   
-          color = VFD_WHITE
+          color = WHITE
+        elif color.lower() in ('lred', 'lightred'):   
+          color = LIGHTRED
+        elif color.lower() in ('lgreen', 'lightgreen'):
+          color = LIGHTGREEN  
+        elif color.lower() in ('dgreen', 'darkgreen'):
+          color = DARKGREEN
+        elif color.lower() in ('dblue', 'darkblue'):
+          color = DARKBLUE
+        elif color.lower() in ('gray', 'grey'):
+          color = GREY
+
         else:
-           color = VFD_WHITE   
+           color = WHITE   
     return  color
 
 
@@ -197,10 +208,11 @@ class Gui(object ):
                {'obj':None ,'axe':'y','unit':1.0, 'value':0,'value_prev':0,'mpos':0,'nanosec':0, 'scale':1.0,'updated': False }]
 
     #_ui_modes=['main','drive','feedJog','feedRun','scaleXY','scaleZ','confirm'] #confirm must be last
-    _ui_modes=['main','drive','params', 'template','confirm'] #confirm must be last
+    _ui_modes=['main','drive', 'template' ,'params','confirm'] #confirm must be last
     _ui_mode=0
     _ui_confirm='unkn'
-    _ui_mode_prev=0
+    #_ui_mode_prev=0
+    _ui_mode_prev=-1
     _dXY_jog:float = DXYZ_STEPS[2]
     _dZ_jog:float = DXYZ_STEPS[2]
     _dXY_run:float = DXYZ_STEPS[2]
@@ -234,30 +246,30 @@ class Gui(object ):
     template = None
     labels = {}  # dictionary of configured messages_labels
     templ_labels = {}  # dictionary to store params of template macro
-    _msg_conf = [ #name, textline, fgcolor, x, y, scale, width, nlines,align
-            ('zeroX', 'X'                         , X_ARROW_COLOR   ,  142,  35,  3, 40    ,1, ALIGN_RIGHT), #9*14
-            ('zeroY', 'Y'                         , Y_ARROW_COLOR   ,  142, 115,  3, 40    ,1, ALIGN_RIGHT),
-            ('zeroZ', 'Z'                         , Z_ARROW_COLOR   ,  142, 195,  3, 40    ,1, ALIGN_RIGHT),
-            ('x', '{:6.2f}'.format(-230.1)         , X_ARROW_COLOR   ,  142+25+10,  35,  3, 126    ,1, ALIGN_RIGHT), #9*14
-            ('y', '{:6.2f}'.format(-230.1)         , Y_ARROW_COLOR   ,  142+25+10, 115,  3, 126    ,1, ALIGN_RIGHT),
-            ('z', '{:6.2f}'.format(-230.1)         , Z_ARROW_COLOR   ,  142+25+10, 195,  3, 126    ,1, ALIGN_RIGHT),
-            ('mx', '{:6.2f}'.format(0.0)       , X_ARROW_COLOR   ,  142+25+10+30,  35+40,  2, 126    ,1, ALIGN_RIGHT), #9*14
-            ('my', '{:6.2f}'.format(0.0)       , Y_ARROW_COLOR   ,  142+25+10+30, 115+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('mz', '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  142+25+10+30, 195+40,  2, 126    ,1, ALIGN_RIGHT),
-            ('dXY', '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  142+10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
-            ('dZ', '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  142+10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
-            ('cmd', '#G29 some command grbl'      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
-            ('feed', '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
-            ('state', 'Idle'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
-            ('mpg', 'noMPG G57'    , 'white'         ,  180,  0,  2, 310-120,1, ALIGN_RIGHT),
-            ('term', 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
-            ('spindeOn', 'ON'           ,  'green'       ,   10, 370,  3, 60     ,1, ALIGN_LEFT),
-            ('home', 'HOME'           ,  'yellow'        ,  110, 370,  3, 60     ,1, ALIGN_CENTER),
-            ('spindeOff', 'OFF'           ,  'red'        ,  250, 370,  3, 60     ,1, ALIGN_RIGHT),
-            ('info', 'info'                        , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
-            ('<', '<<'           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
-            ('icon', '     main     ' , ICON_COLOR, 20+3*14,  410, 2, 250-20-3*14    ,1, ALIGN_CENTER),
-            ('>', '>>'           ,  'lblue'        ,  270, 405,  3, 60     ,1, ALIGN_LEFT)
+    _msg_conf = [   #name, mode_list,textline default, fgcolor, x, y, scale, width, nlines,align
+            ('zeroX', ['main','drive'], 'X'                         , X_ARROW_COLOR   ,  142,  35,  3, 40    ,1, ALIGN_RIGHT), 
+            ('zeroY', ['main','drive'], 'Y'                         , Y_ARROW_COLOR   ,  142, 115,  3, 40    ,1, ALIGN_RIGHT),
+            ('zeroZ', ['main','drive'], 'Z'                         , Z_ARROW_COLOR   ,  142, 195,  3, 40    ,1, ALIGN_RIGHT),
+            ('x', ['main','drive'], '{:6.2f}'.format(-230.1)         , X_ARROW_COLOR   ,  142+25+10,  35,  3, 126    ,1, ALIGN_RIGHT), 
+            ('y', ['main','drive'], '{:6.2f}'.format(-230.1)         , Y_ARROW_COLOR   ,  142+25+10, 115,  3, 126    ,1, ALIGN_RIGHT),
+            ('z', ['main','drive'], '{:6.2f}'.format(-230.1)         , Z_ARROW_COLOR   ,  142+25+10, 195,  3, 126    ,1, ALIGN_RIGHT),
+            ('mx', ['main','drive'], '{:6.2f}'.format(0.0)       , X_ARROW_COLOR   ,  142+25+10+30,  35+40,  2, 126    ,1, ALIGN_RIGHT), 
+            ('my', ['main','drive'], '{:6.2f}'.format(0.0)       , Y_ARROW_COLOR   ,  142+25+10+30, 115+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('mz', ['main','drive'], '{:6.2f}'.format(0.0)       ,Z_ARROW_COLOR    ,  142+25+10+30, 195+40,  2, 126    ,1, ALIGN_RIGHT),
+            ('dXY', ['main','drive'], '{:4.0f}'.format(_dXY_jog  )        , Y_ARROW_COLOR   ,  142+10, (115-35)//2+35+10,  2, 60    ,1, ALIGN_RIGHT),
+            ('dZ', ['main','drive'], '{:4.0f}'.format(_dZ_jog)          , Z_ARROW_COLOR   ,  142+10, 195+40 ,  2, 60    ,1, ALIGN_RIGHT),
+            ('cmd', ['main','drive'], '#G29 some command grbl'      , 'white'         ,    0, 255,  2, 308    ,1, ALIGN_LEFT),  #14*22
+            ('feed', ['main','drive'], '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
+            ('state', ['main','drive'], 'Idle'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
+            ('mpg', ['main','drive'], 'noMPG G57'    , 'white'         ,  180,  0,  2, 310-120,1, ALIGN_RIGHT),
+            ('term', ['template','params'], 'F1 - Help' , 'white'         ,             0,  40,  2, 140          ,10, ALIGN_LEFT),
+            ('spindeOn', ['main','drive'], 'ON'           ,  'green'       ,   10, 370,  3, 60     ,1, ALIGN_LEFT),
+            ('home', ['main','drive'], 'HOME'           ,  'yellow'        ,  110, 370,  3, 60     ,1, ALIGN_CENTER),
+            ('spindeOff', ['main','drive'], 'OFF'           ,  'red'        ,  250, 370,  3, 60     ,1, ALIGN_RIGHT),
+            ('info', [], 'info'                        , 'white'         ,    0, 280,  2, 318    ,4, ALIGN_LEFT),  #6*51
+            ('<', [], '<<'           ,  'yellow'       ,   10, 405,  3, 60     ,1, ALIGN_LEFT),
+            ('icon', [], '     main     ' , ICON_COLOR, 20+3*14,  410, 2, 250-20-3*14    ,1, ALIGN_CENTER),
+            ('>', [], '>>'           ,  'lblue'        ,  270, 405,  3, 60     ,1, ALIGN_LEFT)
 
         ]
     help = [
@@ -285,8 +297,14 @@ class Gui(object ):
 
     gridX0=5
     gridY0=50
-    gridstep=20
+    gridStep=20
     gridCount=7
+
+    imageX0=150
+    imageY0=50
+    imageStep=20
+    imageCount=7
+
     toolPoly=array('h', [6, 0,\
                         6, 2,\
                         3, 5,\
@@ -295,9 +313,12 @@ class Gui(object ):
                         ])             
     cncFieldXmax=700
     cncFieldYmax=700
-    gridMax=(gridCount-1)*gridstep
+    gridMax=(gridCount-1)*gridStep
     cncFieldKX=gridMax/cncFieldXmax
     cncFieldKY=gridMax/cncFieldYmax
+
+    imageMax=(imageCount-1)*imageStep
+
     _xToolCnt=0
     _xToolPrev=None 
     _yToolPrev=None
@@ -321,14 +342,7 @@ class Gui(object ):
        self.grblParserObj=grblParserObj
        self.templateDir = templateDir
 
-       try:
-            self.templ_files = [ff.replace('.py','') for ff in os.listdir(self.templateDir)  if not (ff.startswith('templateGcode') or ff.startswith('_'))]
-            self._current_template_idx=0
-       except OSError:
-            print("Error: No templates directory found.")
-            self._current_template_idx=None
 
-       print(self.templateDir, self.templ_files)
 
 
        self.debug=debug
@@ -341,10 +355,10 @@ class Gui(object ):
     def state(self):
         return self.grblParams._state
     
-    def refresh(self):
+    def refresh(self,clear=None):
        self.neo_refresh= False
        self.neoBlank(time.ticks_diff(time.ticks_ms(),self._touched)>BLANK_SCREEN_MS)
-       refresh(self.neo)
+       refresh(self.neo,clear)
 
     def setYellowButton(self,pin:int):
        self.pin_yellow=Pin(pin, Pin.IN, Pin.PULL_UP)
@@ -362,7 +376,7 @@ class Gui(object ):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #self.http_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
         host = '0.0.0.0'
-        port = 8080
+        port = 80
         self.server.bind((host, port))
         self.server.listen(5)
         self.server.setblocking(False) # Set to non-blocking mode
@@ -557,7 +571,7 @@ class Gui(object ):
               ii+=1
               #if ii==1:
               #   print('point11',cmd) 
-          print('len 2send',len(self.grblCmd2send),ii,self.template.params)  
+          print('len 2send',len(self.grblParserObj.grblCmd2send),ii,self.template.params)  
           self.neoDisplayTemplate(template_name =self.template.template_name)
 
 
@@ -580,7 +594,7 @@ class Gui(object ):
                   self.grblParserObj.queryParams()               
               elif self._ui_modes[self._ui_mode] == 'confirm':
                 self._ui_confirm='yes'
-                self._ui_mode= self._ui_mode_prev
+                self._ui_mode= self._ui_mode_prev if self._ui_mode_prev>=0 else 0
                 #print('button_yellow_callback222: confirm mode, self._ui_confirm_prev=',self._ui_modes[self._ui_mode])
                 
                 if buttonEvent[3] in ('zeroX','zeroY','zeroZ') and len(buttonEvent)>=4 and buttonEvent[3] is not None:
@@ -722,14 +736,65 @@ class Gui(object ):
 
 
     def neoGrid(self):
-        self.neoLabel(text='',id='term',hidden=True)
-        self.neo.fill_rect(self.gridX0,self.gridY0,self.gridMax,self.gridMax,VFD_BLACK)
+        #self.neoLabel(text='',id='term',hidden=True)
+        self.neo.fill_rect(self.gridX0,self.gridY0,self.gridMax,self.gridMax,BLACK)
         for ii in range(self.gridCount):
-          self.neo.hline(self.gridX0,self.gridY0+ii*self.gridstep,self.gridMax,VFD_GRAY)
-          self.neo.vline(self.gridX0+ii*self.gridstep,self.gridY0,self.gridMax,VFD_GRAY) 
+          self.neo.hline(self.gridX0,self.gridY0+ii*self.gridStep,self.gridMax,GREY)
+          self.neo.vline(self.gridX0+ii*self.gridStep,self.gridY0,self.gridMax,GREY) 
         self._xToolPrev=None 
         self._yToolPrev=None
 
+    def neoTemplateImage(self):
+        #self.neoLabel(text='',id='term',hidden=True)
+        self.neo.fill_rect(self.imageX0,self.imageY0,self.imageMax,self.imageMax,BLACK)
+        for ii in range(self.imageCount):
+          self.neo.hline(self.imageX0,self.imageY0+ii*self.imageStep,self.imageMax,GREY)
+          self.neo.vline(self.imageX0+ii*self.imageStep,self.imageY0,self.imageMax,GREY)
+        if self.template is not None and self.template.app is not None:  
+          try:
+             img=self.template.app.getIcon()
+             if img is not None:
+                # print('neoTemplateImage: got template image, size=',len(img),img[:10])
+                #[{'name': 'quadrant', 'height': 10.0, 'fill': True, 'color': 'red', 'shape': 'rect', 'width': 10.0}]
+                #[{'name': 'circle', 'height': 5.0, 'fill': True, 'color': 'blue', 'shape': 'ellipse', 'width': 5.0}]
+                max_dim=0
+                for item in img:
+                    w=item.get('width',1.0)
+                    h=item.get('height',1.0)
+                    if w>max_dim:
+                        max_dim=w
+                    if h>max_dim:
+                        max_dim=h
+                # print('neoTemplateImage: max_dim=',max_dim,' imageMax=',self.imageMax)        
+                K= self.imageMax*0.8/max_dim if max_dim>0 else 0.8 
+                # print('neoTemplateImage: scale K=',K)
+                origin_color=WHITE  
+                for item in img:
+                    color=color2rgb(item.get('color','white'))
+                    shape=item.get('shape','rect')
+                    fill=item.get('fill',False)
+                    w=int(item.get('width',0.)*K)
+                    h=int(item.get('height',0.)*K)
+                    x=int(self.imageX0+5+int(item.get('x',0.)*K))
+                    y=int(self.imageY0+5+int(item.get('y',0.)*K))
+                    if shape=='rect':
+                        # print('neoTemplateImage: point2 rect ',x,y,w,h,color,fill) 
+                        self.neo.fill_rect(x,y,w,h,color) if fill else self.neo.rect(x,y,w,h,color)
+                        if color==WHITE:
+                          origin_color=GREEN
+                    elif shape=='ellipse':
+                        # print('neoTemplateImage: point3 ellipse ',x,y,w,h,color,fill) 
+                        self.neo.fill_ellipse(x,y,w//2,h//2,color) if fill else self.neo.ellipse(x,y,w//2,h//2,color)
+                        if color==WHITE:
+                          origin_color=GREEN
+                    elif shape=='origin':
+                        # print('neoTemplateImage: point3 ellipse ',x,y,w,h,color,fill) 
+                        self.neo.fill_ellipse(x,y,3,3,origin_color) 
+
+
+
+          except Exception as e:             print('Error displaying template image:', e)
+           
 
 
     def neoTool(self,X,Y):
@@ -748,13 +813,13 @@ class Gui(object ):
       self._xToolCnt+=1  
       if self._xToolPrev is not None and self._yToolPrev is not None:
          tool=(gridPrevX-3,gridPrevY-6)
-         self.neo.poly(tool[0],tool[1], self.toolPoly, VFD_BLACK,True )
+         self.neo.poly(tool[0],tool[1], self.toolPoly, BLACK,True )
          if self._xToolCnt%10==0:
             self.neoGrid()
       else: 
          self.neoGrid()  
       tool=(gridNowX-3,gridNowY-6)
-      self.neo.poly(tool[0],tool[1], self.toolPoly, VFD_YELLOW,True )
+      self.neo.poly(tool[0],tool[1], self.toolPoly, YELLOW,True )
       self._xToolPrev=X
       self._yToolPrev=Y
       
@@ -764,7 +829,7 @@ class Gui(object ):
 
 
     def neoInit(self):
-       self.labels=self.neoDrawAreas(self._msg_conf)
+       #self.labels=self.neoDrawAreas(self._msg_conf)
        self.neoHighLight(id=self._highlightedArea, labels=self.labels)
        
        self.neo_refresh= True
@@ -777,84 +842,64 @@ class Gui(object ):
     def neoDrawAreas(self, config_array=[]):
         labels = {}  # dictionary of configured messages_labels
         for c1 in config_array:
-            (name, textline, fgcolor, x, y, scale, width, nlines,align ) = c1  # unpack tuple into five var names
+            
+            (name, mode_list, textline, fgcolor, x, y, scale, width, nlines,align ) = c1  # unpack tuple into five var names
+            if len(mode_list)>0 and self._ui_modes[self._ui_mode] not in mode_list: continue
             fgcolor = color2rgb(fgcolor)
             p=name.find('.')
 
             fnt=arial35 if scale==3 else (arial10 if scale==1 else fixed)
             writer = CWriter(self.neo, fnt, verbose=self.debug)
             writer.set_clip(False, False, False) #row_clip=None, col_clip=None, wrap=None
+
+            rotaryScale=1.0
             
 
             if p>=0:
-              
               name2=name[p+1:]
               if name2 =='OK':
                 ll=Label(writer, y, x, textline, fgcolor=fgcolor, bdcolor=False, align=ALIGN_CENTER)
                 labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
               else:    
                 flw=writer.stringlen('quadrant ')+2
-                fl=Label(writer, y, x, (name2[:8]).upper()+' ',fgcolor=VFD_GREEN)
+                fl=Label(writer, y, x, (name2[:8]).upper()+' ',fgcolor=GREEN)
                 #print('neoDrawAreas:', name,name2, textline, x+flw, y)
                 if name.startswith('$$'):
                    val=float(textline)
                 else:    
-                  val=self.grblParserObj.template.params.get(name2,00.01)
+                  val=self.template.params.get(name2,00.01)
                 ll=Label(writer, y, x+flw, '{:6.2f}'.format(val), bdcolor=False, fgcolor=fgcolor, align=align)
                 rotaryScale= 0.01 if val<=1.0 else (0.1 if val<=10.0 else (1.0 if val<=100.0 else 10.0))
                 labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
-            # elif name in ('xyz'):
-            #   flw=writer.stringlen(name.upper()+': ')
-            #   fl=Label(writer, y, x, name.upper()+': ',fgcolor=VFD_RED if name=='x'  else VFD_GREEN if name=='y' else VFD_LBLUE)
-            #   ll=Label(writer, y, x+flw, '{:6.2f}'.format(-230.1), fgcolor=fgcolor, bdcolor=False, align=align)
-            #   labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor, bdcolor=False , align=align, scale=scale,x=x,y=y,label=ll,fldLabel=fl, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
-            elif name in ('xyz'):
-              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
-            elif name in ('zeroX','zeroY','zeroZ'):
-              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
-            elif name in ('spindeOn','spindeOff','home'):
-              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
-            elif name in ('mx','my','mz'):
-              ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'),rotaryScale=0.1)
-            elif name in ('state','cmd','icon'):
-              ll=Label(writer, y, x, (textline if textline.strip()!='' else name),fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'))
-            elif name in ('dXY','dZ'):
-              ll=Label(writer, y, x, textline,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=0.1)              
-            elif name in ('feed'):
-              ll=Label(writer, y, x,textline ,fgcolor=fgcolor,bgcolor=VFD_BG, align=align)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor ,  bdcolor=False, align=align , scale=scale,x=x,y=y,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=10.0)
-            elif name in ('info','term'):
-              print('info/term',name,textline, (y + nlines * writer.height + 2), (x + width + 2))
-              if ((y + nlines * writer.height + 2) > 480) or ((x + width + 2) > 320):
-                  print('warning: label {} position or size exceeds display dimensions.'.format(name))
-
-              ll=Textbox(writer, clip=False, row=y, col=x, width=width, nlines=nlines, bdcolor=False, fgcolor=fgcolor,bgcolor=VFD_BG)
-              if textline.strip()!='':
-                  ll.append(textline)
-              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , align=align , scale=scale,x=x,y=y,nlines=nlines,label=ll,oneWidth=writer.stringlen('0'),rotaryScale=1.0)
-            else: # etc
+            else: #name in ('xyz','zeroX','zeroY','zeroZ','spindeOn','spindeOff','home','state','cmd','icon','mx','my','mz','dXY','dZ'):
+              if name in ('mx','my','mz','dXY','dZ'):
+                rotaryScale=0.1
+              elif name in ('feed'):
+                rotaryScale=10.0
+              else:                
+                rotaryScale=1.0  
+              if name in ('info','term'):
+                ll=Textbox(writer, clip=False, row=y, col=x, width=width, nlines=nlines, bdcolor=False, fgcolor=fgcolor,bgcolor=VFD_BG)
+              else:
                 ll=Label(writer, y, x,textline, fgcolor=fgcolor, bdcolor=False, align=align)
-                labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'))
+
+              labels[name] = NeoLabelObj(text  = textline, fgcolor=fgcolor , bdcolor=False, align=align, scale=scale,x=x,y=y,label=ll, oneWidth=writer.stringlen('0'),rotaryScale=rotaryScale)
+
+
         return labels
 
 
     # ui label`s updater
     #def neoLabel(self,text,id='info',color=None,currentLine=None, hidden=None, force=False):
     def neoLabel(self,text,id,color=None,currentLine=None, hidden=None, force=False):
+        if not id in self.labels:
+            return
         if hidden is not None :
           if hidden and self.labels[id].hidden and not force:
               return
           self.labels[id].hidden = hidden        
         if self._blank:
            return
-        if  id not in self.labels:
-            return
         self.labels[id].text = text
         #if id=='state':
         #  self.labels[id].text += (' MPG' if self.grblParams._mpg else '   ')+(' '+self.grblParams._wcs if self.grblParams._wcs is not None else  '    ')
@@ -871,29 +916,27 @@ class Gui(object ):
         
             
         if id=='state' and text.lower().startswith('alarm'):
-             self.labels[id].fgcolor=VFD_RED
+             self.labels[id].fgcolor=RED
         elif id=='state' and  (text.lower().startswith('run') or text.lower().startswith('jog')):
-             self.labels[id].fgcolor=VFD_GREEN
+             self.labels[id].fgcolor=GREEN
         elif id=='feed' and text.lower().startswith('alarm'):
-             self.labels[id].fgcolor=VFD_RED
+             self.labels[id].fgcolor=RED
         elif id=='feed' and (text.lower().startswith('run') or text.lower().startswith('jog')):
-             self.labels[id].fgcolor=VFD_GREEN
-#        elif id=='info' and  self.grblParams._mpg=='1':
-#             self.labels[id].fgcolor=VFD_LBLUE
+             self.labels[id].fgcolor=GREEN
         elif id=='info' and  text.find('Alarm')>=0:
-             self.labels[id].fgcolor=VFD_RED
+             self.labels[id].fgcolor=RED
         elif id=='info' and  text.find('Jog')>=0:
-             self.labels[id].fgcolor=VFD_GREEN
+             self.labels[id].fgcolor=GREEN
         elif id=='info' and  text.find('Run')>=0:
-             self.labels[id].fgcolor=VFD_YELLOW
+             self.labels[id].fgcolor=YELLOW
         elif id=='info' and  text.find('Hold')>=0:
-             self.labels[id].fgcolor=VFD_GRAY
+             self.labels[id].fgcolor=GREY
         elif id=='info' and self.grblParams._mpg=='1':
-             self.labels[id].fgcolor=VFD_LBLUE
+             self.labels[id].fgcolor=CYAN
         elif id=='info' and self.grblParams._mpg!='1':
-             self.labels[id].fgcolor=VFD_WHITE
+             self.labels[id].fgcolor=WHITE
         elif id=='mpg' and  self.grblParams._mpg=='1':
-             self.labels[id].fgcolor=VFD_GREEN
+             self.labels[id].fgcolor=GREEN
         elif color is not None:
              self.labels[id].fgcolor=color2rgb(color)
         else:   
@@ -1011,36 +1054,34 @@ class Gui(object ):
           ff=self.grblParserObj._cnc_params[self._current_template_idx] 
           xx=60
           yy=Y_POS_LABEL_PARAMS+30
-          templ_config.append((template_name+'.'+ff[0], ff[1] , 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
+          templ_config.append((template_name+'.'+ff[0],['params'], ff[1] , 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
           rows=1
           #ii+=1
           #yy=int(yw*1.5)+Y_POS_LABEL_PARAMS    
           #xx=100
           #templ_config.append((template_name+'.OK', '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
       else:    
-        rows=(len(self.grblParserObj.template.params)+1+PARAMS_IN_ROW-1)//PARAMS_IN_ROW
-        for param,val in self.grblParserObj.template.params.items():
+        rows=(len(self.template.params)+1+PARAMS_IN_ROW-1)//PARAMS_IN_ROW
+        for param,val in self.template.params.items():
             xx=(ii%PARAMS_IN_ROW)*xw+10
             yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS
-            templ_config.append((template_name+'.'+param, '{0:.1f}'.format(val) , 'yellow'   ,  xx,  yy,  1, xw-10,1, ALIGN_RIGHT))
+            templ_config.append((template_name+'.'+param,['template'], '{0:.1f}'.format(val) , 'yellow'   ,  xx,  yy,  1, xw-10,1, ALIGN_RIGHT))
             ii+=1
         
         
         xx=int((ii%PARAMS_IN_ROW)*(xw+0.4))
         yy=(ii//PARAMS_IN_ROW)*yw+Y_POS_LABEL_PARAMS    
-        templ_config.append((template_name+'.OK', '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
+        templ_config.append((template_name+'.OK',['template'], '   OK  ', 'yellow'   ,  xx,  yy,  2, xw-10,1, ALIGN_RIGHT))
 
       
 
       if rows>=0:
         if template_name !='$$':
           for ii in range(rows+1) :
-            self.neo.line(10,Y_POS_LABEL_PARAMS+ii*yw-10,310,Y_POS_LABEL_PARAMS+ii*yw-10,VFD_GRAY)
+            self.neo.line(10,Y_POS_LABEL_PARAMS+ii*yw-10,310,Y_POS_LABEL_PARAMS+ii*yw-10,GREY)
           for ii in range(PARAMS_IN_ROW-1) :
-            self.neo.line((ii+1)*xw+5,Y_POS_LABEL_PARAMS-15,(ii+1)*xw+5,Y_POS_LABEL_PARAMS+rows*yw-5,VFD_GRAY)
-      #print('templ_config=',templ_config) 
+            self.neo.line((ii+1)*xw+5,Y_POS_LABEL_PARAMS-15,(ii+1)*xw+5,Y_POS_LABEL_PARAMS+rows*yw-5,GREY)
       self.templ_labels=self.neoDrawAreas(templ_config)
-      #print('templ_labels=',self.templ_labels)
       for ll in self.templ_labels:
           self.neoDraw(ll, labels=self.templ_labels)
       self.neo_refresh= True 
@@ -1079,7 +1120,7 @@ class Gui(object ):
         if self._pressedX is not None and self._pressedY is not None:
             if self._pressedOldX is not None and self._pressedOldY is not None:
                 self.neo.rect(self._pressedOldX-5,self._pressedOldY-5,10,10,VFD_BG,True)
-            self.neo.rect(self._pressedX-5,self._pressedY-5,10,10,VFD0_WHITE,True)
+            self.neo.rect(self._pressedX-5,self._pressedY-5,10,10,WHITE,True)
             self.neo_refresh= True
 
     # draw/update neo display label    
@@ -1100,7 +1141,7 @@ class Gui(object ):
 
             if isinstance(labels[id].label,Textbox )  :
               if labels[id].invert:
-                labels[id].label.bdcolor=VFD_LBLUE
+                labels[id].label.bdcolor=CYAN
               else:
                 labels[id].label.bdcolor=False  
               labels[id].label.clear()
@@ -1120,9 +1161,9 @@ class Gui(object ):
             else:
               if id.find('.')>=0 :
                 if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
-                  labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
+                  labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(CYAN if labels[id].invert else False))
                 else:    
-                  labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(VFD_LBLUE if labels[id].invert else False))
+                  labels[id].label.value(labels[id].text[:labels[id].charsl],fgcolor=labels[id].fgcolor, align=labels[id].align, invert=False,bdcolor=(CYAN if labels[id].invert else False))
               else:      
                 if labels[id].charsl-len(labels[id].text)>0  and (labels[id].align is None or labels[id].align==ALIGN_LEFT) :
                   labels[id].label.value( labels[id].text + ( " " * (labels[id].charsl + (1 if id not in('xyz') else 0)  - len(labels[id].text) ))   ,fgcolor=labels[id].fgcolor, align=labels[id].align, invert=labels[id].invert,bdcolor=labels[id].bdcolor)
@@ -1242,7 +1283,7 @@ class Gui(object ):
          return 
       if DisplayInfoLen>6 and self._ui_modes[self._ui_mode] in ('main','drive'):
          return 
-      if not self.labels['info'].hidden and  DisplayInfoLen<3:
+      if 'info' in self.labels and not self.labels['info'].hidden and  DisplayInfoLen<3:
         self.neoLabel(self.grblParams._grbl_display_state,id='info')
       
       if self._ui_modes[self._ui_mode] in ('params') and self.grblParserObj._cnc_params_need_show:
@@ -1385,8 +1426,17 @@ class Gui(object ):
 
     def refreshUiMode(self):
       self._ui_confirm='unkn'
-      print('refreshUiMode:',self.rotaryObj[0]['axe'],self._ui_modes[self._ui_mode] )
+      #print('refreshUiMode:',self.rotaryObj[0]['axe'],self._ui_modes[self._ui_mode] )
+      
+        
+      # initRotaryStart
+        
       if self._ui_modes[self._ui_mode] in ('main','drive'):
+        if self._ui_mode_prev<0 or self._ui_modes[self._ui_mode_prev] not in ('main','drive'):
+           if not self._ui_modes[self._ui_mode] in ('confirm'):
+              self.refresh(True)
+              self.labels=self.neoDrawAreas(self._msg_conf)
+           
         self.neoGrid()
         self.neoLabel(self.grblParams._grbl_info,'info',hidden=False, force=True)
         if self.rotaryObj[0]['axe']!='icon' and not self._highlightedArea in ('zeroX','zeroY','zeroZ','spindeOn','spindeOff','home'):
@@ -1402,14 +1452,31 @@ class Gui(object ):
 
         self.show_dXY()
         self.show_dZ()
+        self.show_MPG()
         self.show_coordinates()
         
         if self.rotaryObj[0]['axe']!='icon':
           self.neoHighLight(id= 'x',labels=self.labels) # default highlight x coordinate in main and drive modes
       elif self._ui_modes[self._ui_mode] in ('template','params'):
+        if self._ui_mode_prev<0 or not self._ui_modes[self._ui_mode_prev] in ('template','params'):
+           if not self._ui_modes[self._ui_mode] in ('confirm'):
+              self.refresh(True)
+              self.labels=self.neoDrawAreas(self._msg_conf)
+
+        if self._ui_modes[self._ui_mode] in ('template'):
+          try:
+              self.templ_files = [ff.replace('.py','') for ff in os.listdir(self.templateDir)  if not (ff.startswith('templateGcode') or ff.startswith('_'))]
+              self._current_template_idx=0
+          except OSError:
+              print("Error: No templates directory found.")
+              self._current_template_idx=None
+          #print(self.templateDir, self.templ_files)
+
+
         self.neoIcon(text=self._ui_modes[self._ui_mode]) 
         self._current_template_idx=0
         self.neoHighLight(id='term',labels=self.labels)
+        
         if self._ui_modes[self._ui_mode] in ('params'):
           self.grblParserObj.queryParams()
 
@@ -1420,7 +1487,7 @@ class Gui(object ):
      
 
     def nextUiMode(self, direction=None, to_mode=None, refresh=True):
-        print('nextUiMode:',direction,'to:',to_mode,self._ui_modes[to_mode]if to_mode is not None else None,'prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
+        # print('nextUiMode:',direction,'to:',to_mode,self._ui_modes[to_mode]if to_mode is not None else None,'prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
         oldUiMode=self._ui_mode
         newMode = self._ui_mode
         if direction is not None :
@@ -1433,14 +1500,14 @@ class Gui(object ):
           newMode=len(self._ui_modes)-2
         elif newMode>=len(self._ui_modes)-1:
           newMode=0
-        print('nextUiMode: [3]','new:',newMode,self._ui_modes[newMode]  ,'prev:',oldUiMode,self._ui_modes[oldUiMode])
+        # print('nextUiMode: [3]','new:',newMode,self._ui_modes[newMode]  ,'prev:',oldUiMode,self._ui_modes[oldUiMode])
         if oldUiMode!=newMode or refresh:
-          print('nextUiMode: [4]','new:',newMode,self._ui_modes[newMode] if newMode is not None else None,'prev:',oldUiMode,self._ui_modes[oldUiMode])
+          # print('nextUiMode: [4]','new:',newMode,self._ui_modes[newMode] if newMode is not None else None,'prev:',oldUiMode,self._ui_modes[oldUiMode])
           if oldUiMode is not None and self._ui_modes[oldUiMode] not in ('confirm') and oldUiMode!=newMode:
             self._ui_mode_prev=oldUiMode  
-          print('nextUiMode:[res]','prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
+          # print('nextUiMode:[res]','prev:',self._ui_mode_prev,self._ui_modes[self._ui_mode_prev])
           self._ui_mode=newMode
-          print('nextUiMode:[res]','new:',self._ui_mode,self._ui_modes[self._ui_mode])
+          # print('nextUiMode:[res]','new:',self._ui_mode,self._ui_modes[self._ui_mode])
           self.refreshUiMode()
 
         
@@ -1452,7 +1519,7 @@ class Gui(object ):
 
 
     def leave2PrevAfterConfirm(self, to_mode) :
-       self.nextUiMode(direction=None,to_mode=to_mode, refresh=True) # enter in confirm mode
+       self.nextUiMode(direction=None,to_mode=to_mode if to_mode>=0 else 0, refresh=True) # enter in confirm mode
 
 
     def getConfirm(self):
@@ -1507,7 +1574,7 @@ class Gui(object ):
                   rotObj['rotary_on_mpos'] = value 
                   updated=True
                 elif rotObj['axe'].find('.') >=0 :
-                  params=self.grblParserObj.template.params if self._ui_modes[self._ui_mode] in ('template') else self.grblParserObj._cnc_params
+                  params=self.template.params if self._ui_modes[self._ui_mode] in ('template') else self.grblParserObj._cnc_params
                   if params is not None:
                     param=rotObj['axe'][rotObj['axe'].find('.')+1:]
                     param_val=self.get_param_by_index( params,param)
@@ -1607,19 +1674,26 @@ class Gui(object ):
         self.rotaryObj[rotN]['updated'] = True
 
     def upd_rotary_on_icon(self,rotN:int):
-        print('upd_rotary_on_icon')  
+        #print('upd_rotary_on_icon')  
         self.nextUiMode((1 if self.rotaryObj[rotN]['value'] - self.rotaryObj[rotN]['rotary_on_mpos']>0 else -1))
         self.rotaryObj[rotN]['updated']=True
 
 
     def upd_rotary_on_term(self,rotN:int):
+        #print('upd_rotary_on_term: point1')
         if self.rotaryObj[rotN]['obj'] is None or self.rotaryObj[rotN]['rotary_on_mpos'] is None:
            return            
+        #print('upd_rotary_on_term: point2')
         delta_val = self.rotaryObj[rotN]['obj'].value() - self.rotaryObj[rotN]['rotary_on_mpos']
+        #print('upd_rotary_on_term: point3 delta_val=',delta_val)
         if delta_val==0 :
             return
         if self._ui_modes[self._ui_mode] == 'template': 
+          #print('upd_rotary_on_term: point4 delta_val=',delta_val)
           self.termShiftPos(rotN, delta_val, self.templ_files)
+          # todo self.neoDisplayTemplate(template_name ='$$')
+          self.initTemplate()
+          self.neoTemplateImage()
         elif self._ui_modes[self._ui_mode] == 'params':    
           self.termShiftPos(rotN, delta_val, self.grblParserObj._cnc_params)
           self.neoDisplayTemplate(template_name ='$$')
@@ -1687,7 +1761,7 @@ class Gui(object ):
             self._current_template_idx=0
         else:
             self._current_template_idx=index
-        
+        print('termShiftPos: point5 index=',index)
         self.rotaryObj[rotN]['updated'] = True
         self.neoDraw('term', labels=self.labels, currentLine=self._current_template_idx)   
 
@@ -1839,7 +1913,7 @@ class Gui(object ):
 
 
     def neoTerm(self,text,color=None, currentLine=None,hidden=None) :   
-        self.neoLabel(text,id='term',color=VFD_WHITE if color is None else  color,currentLine=currentLine,hidden=hidden )  
+        self.neoLabel(text,id='term',color=WHITE if color is None else  color,currentLine=currentLine,hidden=hidden )  
 
 
     def neoTermInfo(self,command) :   
@@ -1855,7 +1929,7 @@ class Gui(object ):
       elif command=='termHome' : 
           self.homeTermPos()
       if len(self.grblParams._grbl_info)>0:
-        self.neoLabel(self.grblParams._grbl_info,id='term',color=VFD_WHITE )        
+        self.neoLabel(self.grblParams._grbl_info,id='term',color=WHITE )        
        
     def inc_feedrateJog(self):
       if self._feedrateJog+100.0 > C_FEED_JOG_MAX:
@@ -2001,7 +2075,7 @@ class Gui(object ):
                     elif self._ui_modes[self._ui_mode] == 'drive':
                       self.upd_rotary_on_drive(rotN)
                     elif self._ui_modes[self._ui_mode] == 'template':
-                      self.upd_rotary_on_template(rotN,self.grblParserObj.template.params)
+                      self.upd_rotary_on_template(rotN,self.template.params)
                     elif self._ui_modes[self._ui_mode] == 'params':
                       self.upd_rotary_on_template(rotN,self.grblParserObj._cnc_params)
 

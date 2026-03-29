@@ -17,10 +17,12 @@ class App(TemplateGcode):
         self.__z:float = 0.0
     
     def getIcon(self):
-        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.height, "fill": True, "color": "red"}]
+        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.height, "fill": True, "color": "yellow"},
+                {"name": "origin", "shape": "origin", "x": 0, "y": 0, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
     
 
     def getOneLayerGcode(self):
         return f'G1 X{self.width} Y0 F{self.feed} \nG1 X{self.width} Y{self.height}\nG1 X0 Y{self.height}\nG1 X0 Y0'.splitlines()
 
+                    

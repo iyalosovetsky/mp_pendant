@@ -65,7 +65,7 @@ DEBUG = False
 
  
 
-refresh(ssd, True)
+
 
 st = GrblState(uart_grbl_mpg = uartMPG,neo=ssd,debug=False, templateDir='/templates')
 st.gui.set_rotary_obj(rot0,0,'x',1.0)

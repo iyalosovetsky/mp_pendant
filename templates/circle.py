@@ -20,7 +20,8 @@ class App(TemplateGcode):
   
     
     def getIcon(self):
-        return [{"name": self.__shape__, "shape": "ellipse", "width": self.diameter/2, "height": self.diameter/2, "fill": True, "color": "blue"}]
+        return [{"name": self.__shape__, "shape": "ellipse", "x": self.diameter/2, "y": self.diameter/2, "width": self.diameter, "height": self.diameter, "fill": True, "color": "green"},
+                {"name": "origin", "shape": "origin", "x": self.diameter/2, "y": self.diameter/2, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
 
     def getOneLayerGcode(self):
