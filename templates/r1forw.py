@@ -6,18 +6,18 @@ class App(TemplateGcode):
     
     
     def __init__(self):
-        self.width:float = 35.0
-        self.height:float = 21.0
-        self.feed:float = 100.0
+        self.width:float = 21.0
+        self.height:float = 35.0
+        self.feed:float = 250.0
         self.zfeed:float = 10.0
-        self.toolDiameter:float = 8.0
-        self.down:float =1.0
-        self.dz:float = 0.1
+        self.toolDiameter:float = 6.0
+        self.down:float =10.0
+        self.dz:float = 0.3
         self.__shape__  = 'rectTF'
         self.__z:float = 0.0
     
     def getIcon(self):
-        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.height, "fill": True, "color": "yellow"},
+        return [{"name": self.__shape__, "shape": "rect", "width": self.width, "height": self.height, "x": 0, "y": 0, "fill": True, "color": "yellow"},
                 {"name": "origin", "shape": "origin", "x": 0, "y": 0, "width": 3, "height": 3, "fill": True, "color": "blue"}]
     
     def  getOriginGcode(self,loop=1):
@@ -43,9 +43,10 @@ class App(TemplateGcode):
                 break
 
             gcode.extend(self.getOriginGcode(ii))
-            # gcode.extend(f'G91 G1 X{w} Y0 \nG1 X{w} Y{h}\nG1 X0 Y{h}\nG1 X0 Y0'.splitlines())
             gcode.extend(f'G91 G1 X{w} Y0 \nG1 X0 Y{h}\nG1 X-{w} Y0\nG1 X0 Y-{h}'.splitlines())
             gcode.append('G91')
+            if w<self.width/2 and h<self.height/2:
+                break
 
 
 

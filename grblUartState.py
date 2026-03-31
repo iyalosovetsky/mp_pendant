@@ -2,7 +2,8 @@ import time
 import machine
 from machine import UART
 from gui import Gui
-
+MAX_GRBL_BF_Q=100 
+MAX_GRBL_BF_BYTES=1023
 
 class GrblParams:
     """
@@ -61,6 +62,11 @@ class GrblParams:
         self._wcs_prev:str = ''
         self._pn_prev = ''
         self._pn = ''
+        self.bf_max_q=50 
+        self.bf_max_bytes=512
+
+        self._bf = [100,1024]
+        self._bf_prev = [-1,-1]
 
 
 
@@ -93,7 +99,7 @@ GRBL_QUERY_INTERVAL_RUN = 520000000  # 0.5s in nanoseconds
 MPG_INTERVAL = 500000000  # 0.5s in nanoseconds
 #ROTARY_DUMP2_JOG_INTERVAL = 600000000  # 0.6s in nanoseconds
 ROTARY_DUMP2_JOG_INTERVAL = 310000000  # 0.6s in nanoseconds
-POP_CMD_GRBL_INTERVAL =  220000000 # 0.2s in nanoseconds for pop cmd to grbl
+POP_CMD_GRBL_INTERVAL =  820_000_000 # 0.82s in nanoseconds for pop cmd to grbl
 POP_UART_GRBL_INTERVAL =  230000000 # 0.2s in nanoseconds for pop cmd to grbl
 RUN_NOW_INTERVAL =  240000000 # 0.2s in nanoseconds for pop cmd to grbl
 POP_BUTTON_INTERVAL=  350000000 # 0.3s in nanoseconds for pop cmd to grbl
@@ -161,6 +167,10 @@ class GrblState(object):
     _wcs_changed:bool = False
     _mpg_changed:bool = False
     _pn_changed:bool = False
+    _bf_changed:bool = False
+    _bf_full:bool = False
+    
+    
     neo = None
     
 
@@ -383,16 +393,10 @@ class GrblState(object):
         #self.flashKbdLEDs(LED_ALL , BLINK_2) ##7 - 3 leds       # 1 - macro1
         self.mpgCommand(command)
         if command !='?':
-          #self.sendedQuery2grblCounter = 0
           self.gui.neoLabel(command,id='cmd')
-        else:
-          if self.editCmd!='':
-            self.grblCmd2send=[]
-          #else: 
-          #   #self.sendedQuery2grblCounter+=1
-          #   #if  self.sendedQuery2grblCounter>10:
-          #   #   self.sendedQuery2grblCounter = 0
-          #   #   self.gui.neoLabel('',id='cmd')
+        #else:
+        #  if self.editCmd!='':
+        #    self.grblCmd2send=[]
       elif command=='-y':
           self.gui.grblJog(y=-self.step)
       elif  command=='+y':
@@ -461,16 +465,13 @@ class GrblState(object):
       elif command in ('#'):  
         self.toggleMPG()
       elif command in ('cancel'):  
-        # if self.state == 'run' or self.state == 'jog':
-          #self.flashKbdLEDs(LED_SCROLLLOCK , BLINK_5) ##2 - leds ???       # 2 - macro1 10/2 blink
+          self.grblCmd2send=[]
           self.uart_grbl_mpg.write(bytearray(b'\x85\r\n')) #Jog Cancel
           self.uart_grbl_mpg.write(bytearray(b'\x18\r\n')) # cancel ascii ctrl-x
           self.gui.neoLabel(command,id='cmd')
           self.query_now('cancel')
-        # else:
-          #self.flashKbdLEDs(LED_ALL , BLINK_2) ##7 - 3 leds       # 1 - macro1
-          # pass 
       elif command in ('reset'):  
+          self.grblCmd2send=[]
           self.uart_grbl_mpg.write(bytearray(b'\x85\r\n')) #Jog Cancel
           self.uart_grbl_mpg.write(bytearray(b'\x18\r\n')) # cancel ascii ctrl-x
           self.gui.neoLabel(command,id='cmd')
@@ -525,7 +526,12 @@ class GrblState(object):
           print('popCmd2grbl: busy', self._grblExecProgress, l_cmd )
           return 1
         else:
+          if self._bf_full :
+            #  print('popCmd2grbl: buf is FULL!')
+             return 3
           l_cmd=self.grblCmd2send.pop(0)
+          if l_cmd.startswith('G1') or l_cmd.startswith('G01') or l_cmd.startswith('G2') or  l_cmd.startswith('G02'):
+            self.p_RTSetNewInterval('popCmd2grbl',GRBL_QUERY_INTERVAL_RUN)
           self.send2grblOne(l_cmd)
           return 0
       else: 
@@ -667,7 +673,10 @@ class GrblState(object):
                     elif  len(elem)>=1 and elem[0]=='wcs' and elem[1] is not None:       
                         self.changeWCS(elem[1])                            
                     elif  len(elem)>=1 and elem[0]=='pn' and elem[1] is not None:       
-                        self.changePn(elem[1])                            
+                        self.changePn(elem[1])           
+                    elif  len(elem)>=1 and elem[0]=='bf' and elem[1] is not None:       
+                        self.changeBf([int(bb) for bb in elem[1].split(',')])           
+
             if l_state is not None:
                  self.changeState(l_state)            
             self._parse_state_code='done'
@@ -845,11 +854,26 @@ class GrblState(object):
       self.grblParams._pn = pn
       self._pn_changed = (self.grblParams._pn_prev != self.grblParams._pn)
       if self._pn_changed:
-         print('changePn:', self.grblParams._pn)
+         #print('changePn:', self.grblParams._pn)
          self.gui.neo_refresh= True
 
          
+    def changeBf(self, bf):
+      if  len(bf)!=2: 
+         return
+      self.grblParams._bf_prev = self.grblParams._bf
+      self.grblParams._bf = bf
+      self._bf_changed = (self.grblParams._bf_prev[0] != self.grblParams._bf[0] or self.grblParams._bf_prev[1] != self.grblParams._bf[1])
+      #Bf:15,128. The first value is the number of available blocks in the planner buffer and the second is number of available bytes in the serial RX buffer.
+      if self._bf_changed:
+         #print('changeBf:', self.grblParams._bf)
+         if self.grblParams.bf_max_q<self.grblParams._bf[0]:
+            self.grblParams.bf_max_q=self.grblParams._bf[0]
+         if self.grblParams.bf_max_bytes<self.grblParams._bf[1]:
+            self.grblParams.bf_max_bytes=self.grblParams._bf[1]
+         self._bf_full=(self.grblParams._bf[0]<self.grblParams.bf_max_q//3 or self.grblParams._bf[1]<self.grblParams.bf_max_bytes//4)    
             
+         self.gui.neo_refresh= True            
 
     def changeMPG(self, mpg):
       self.grblParams._mpg_prev=self.grblParams._mpg
@@ -878,8 +902,7 @@ class GrblState(object):
         if self._grblExecProgress in ('do','doing','alarm','error'):
             #print ('upd_rotary: scip on _grblExecProgress=',self._grblExecProgress)
             return 1
-        if self._mPosInited :
-          self.gui.upd_rotary()
+        self.gui.upd_rotary()
         return 0 
  
 

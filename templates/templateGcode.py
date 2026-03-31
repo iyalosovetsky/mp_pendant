@@ -6,11 +6,11 @@ class TemplateGcode():
     
     def __init__(self):
         #self.diameter:float = 10.0
-        self.feed:float = 100.0
+        self.feed:float = 200.0
         self.zfeed:float = 10.0
-        self.toolDiameter:float = 8.0
-        self.down:float =1.0
-        self.dz:float = 0.1
+        self.toolDiameter:float = 6.0
+        self.down:float =10.0
+        self.dz:float = 0.4
         self.__z:float = 0.0
         
         

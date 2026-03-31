@@ -35,7 +35,7 @@ def connect_wifi(ssid, password):
     return wlan.ifconfig()[0]
 
 
-ip = connect_wifi('IGORNET', 'IG0RNET29041971') 
+
 
 
 # Initialize UART (adjust parameters for your board/pins)
@@ -78,24 +78,21 @@ rot0.add_listener(st.rotary_listener0)
     
 kbd.objGrblStateSetter(st)
 
-#refresh(ssd)
-
-
+#refresh(ssd,True)
 term_reader = TermReader(sys.stdin.buffer)
 print('display started')
 
-#ns = Touch(isLandscape=False)
-#ns.set_int_handler(st.gui.touchscreen_press)
-print('touch initialized')
+try:
+    ip = connect_wifi('IGORNET', 'IG0RNET29041971') 
+    st.gui.start_http(ip)
 
-#p_yellow=Pin(17, Pin.IN, Pin.PULL_UP)
-#p_red=Pin(16, Pin.IN, Pin.PULL_UP)
-#bt_red=Button(pin=p_yellow,callback=st.button_red_callback,callback_long=st.button_red_callback_long)
-#bt_yellow=Button(pin=p_red,callback=st.button_yellow_callback,callback_long=st.button_yellow_callback_long)
-
+    print('http Started')
+except Exception as e:
+    print('main: error start http',e)    
 
 
-st.gui.start_http(ip)
+
+
 
 
 while True:
