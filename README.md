@@ -42,7 +42,8 @@ model <img width="1417" height="872" alt="image" src="https://github.com/user-at
 Home screen <img width="702" height="1283" alt="image" src="https://github.com/user-attachments/assets/0f5cd5ff-1948-486f-bbdf-80bd15951706" />
 
 
-Template screen <img width="647" height="1223" alt="image" src="https://github.com/user-attachments/assets/aa2432f9-1e62-423c-b65c-525b7aa2504a" />
+Template screen <img width="808" height="1191" alt="image" src="https://github.com/user-attachments/assets/69f74836-89bc-4736-86df-f3d507027064" />
+
 
 
 
