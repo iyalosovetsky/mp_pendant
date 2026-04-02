@@ -15,13 +15,16 @@ Parts:
 
 https://biqu.equipment/products/bigtreetech-tft35-spi-v2-1-touchscreen-io2can-module?_pos=1&_psq=bigtreetech%2FTFT35-SPI&_ss=e&_v=1.0
 
+[datasheet ili9488] https://download.kamami.pl/p1185547-NS2009.pdf
+[datasheet ili9488] https://www.lcdwiki.com/res/MSP3520/ILI9488%20Data%20Sheet.pdf
+
 
 Libraries:
 
 nanoguidlib https://github.com/peterhinch/micropython-nano-gui (modified)
 
 
-touchpad https://download.kamami.pl/p1185547-NS2009.pdf (modified)
+ 
 
 youtube
 https://www.youtube.com/shorts/EfERpko-Jbs
