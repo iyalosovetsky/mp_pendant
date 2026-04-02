@@ -7,11 +7,11 @@ class App(TemplateGcode):
     
     def __init__(self):
         self.width:float = 10.0
-        self.feed:float = 100.0
+        self.feed:float = 280.0
         self.zfeed:float = 10.0
-        self.toolDiameter:float = 8.0
-        self.down:float =1.0
-        self.dz:float = 0.1
+        self.toolDiameter:float = 6.2
+        self.down:float =12.0
+        self.dz:float = 0.41
         self.__shape__  = 'quadrant'
         self.__z:float = 0.0
     

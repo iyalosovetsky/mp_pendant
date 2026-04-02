@@ -228,7 +228,7 @@ class Gui(object ):
             ('feed', ['main','drive'], '{:4.0f}'.format(_feedrateJog)    , 'white'   ,  0,  0,  2, 6*15-1,1, ALIGN_LEFT),
             ('state', ['main','drive'], 'Idle'    , 'white'         ,  6*14,  0,  2, 310-120,1, ALIGN_LEFT),
             ('mpg', ['main','drive'], 'noMPG G57'    , 'white'         ,  180,  0,  2, 310-120,1, ALIGN_RIGHT),
-            ('term', ['template','params'], 'F1 - Help' , 'white'         ,             5,  5,  2, 135          ,8, ALIGN_LEFT),
+            ('term', ['template','params'], 'F1 - Help' , 'white'         ,             5,  5,  2, 140          ,8, ALIGN_LEFT),
             ('spindeOn', ['main','drive'], 'ON'           ,  'green'       ,   10, 370,  3, 60     ,1, ALIGN_LEFT),
             ('home', ['main','drive'], 'HOME'           ,  'yellow'        ,  110, 370,  3, 60     ,1, ALIGN_CENTER),
             ('spindeOff', ['main','drive'], 'OFF'           ,  'red'        ,  250, 370,  3, 60     ,1, ALIGN_RIGHT),
@@ -266,7 +266,7 @@ class Gui(object ):
     gridStep=20
     gridCount=7
 
-    imageX0=145
+    imageX0=150
     imageY0=10
     imageStep=20
     imageCount=9
@@ -736,7 +736,9 @@ class Gui(object ):
                 # print('neoTemplateImage: scale K=',K)
                 origin_color=WHITE  
                 for item in img:
+                    # print('point1',item.get('color','????'),item)
                     color=color2rgb(item.get('color','white'))
+                    # print('point1/1',color)
                     shape=item.get('shape','rect')
                     fill=item.get('fill',False)
                     w=int(item.get('width',0.)*K)
@@ -756,6 +758,8 @@ class Gui(object ):
                     elif shape=='origin':
                         # print('neoTemplateImage: point3 ellipse ',x,y,w,h,color,fill) 
                         self.neo.fill_ellipse(x,y,3,3,origin_color) 
+                    elif shape=='arrow':
+                        self.neo.line(x,y, x+w,y+h, color)                         
 
 
 
@@ -1043,6 +1047,7 @@ class Gui(object ):
 
       if rows>=0:
         if template_name !='$$':
+          self.neo.fill_rect(10,Y_POS_LABEL_PARAMS,310,Y_POS_LABEL_PARAMS+(rows+1)*yw-10,BLACK)
           for ii in range(rows+1) :
             self.neo.line(10,Y_POS_LABEL_PARAMS+ii*yw-10,310,Y_POS_LABEL_PARAMS+ii*yw-10,GREY)
           for ii in range(PARAMS_IN_ROW-1) :

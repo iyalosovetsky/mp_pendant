@@ -10,17 +10,17 @@ class Template:
     #__slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','width','height','app']
 
     def __init__(self, template_name:str, template_dir:str='/templates',
-                 diameter:float = 10.0, feed:float = 100.0, zfeed:float = 10.0, 
-                 toolDiameter:float = 8.0, down:float =1.0, dz:float = 0.1,
-                 width:float = 10.0, height:float = 20.0):
-        self.width:float = width
-        self.height:float = height
-        self.feed:float = feed
-        self.zfeed:float = zfeed
-        self.toolDiameter:float = toolDiameter
-        self.diameter:float = diameter
-        self.down:float = down  
-        self.dz:float = dz
+                 diameter:float = None, feed:float = None, zfeed:float = None, 
+                 toolDiameter:float = None, down:float =None, dz:float = None,
+                 width:float = None, height:float = None):
+        # self.width:float = width
+        # self.height:float = height
+        # self.feed:float = feed
+        # self.zfeed:float = zfeed
+        # self.toolDiameter:float = toolDiameter
+        # self.diameter:float = diameter
+        # self.down:float = down  
+        # self.dz:float = dz
         global loaded_app
         loaded_app=None
         self.app=None
@@ -28,7 +28,8 @@ class Template:
         self.template_dir=template_dir
         self.params={}
         self.loadApp()
-        self.setParams(feed=feed, zfeed=zfeed, toolDiameter=toolDiameter, down=down, dz=dz)
+        #self.setParams(feed=feed, zfeed=zfeed, toolDiameter=toolDiameter, down=down, dz=dz)
+        self.setParams()
         
     
     def loadApp(self ):
@@ -60,12 +61,14 @@ class Template:
                 #print(f"{key} found in app ")
                 vv=None
                 #vv=eval('loaded_app.'+key)
+                
                 try:
                     vv=eval('loaded_app.'+key)  
                 except AttributeError:
                     print('Attribute not found', key)  
                 except NameError :    
                     print('Name error not found', 'loaded_app.'+key)  
+                #print(f"{key} equal ={vv} ")    
                 if vv is not None:
                     #print(f"{key} found in app and added to params with  ",vv)
                     self.params[key]=vv    
@@ -76,10 +79,9 @@ class Template:
              
 
     def updateParams(self):
-        print('updateParams: need param update',loaded_app,self.params)
+        print('updateParams: need param update',loaded_app,self.params, 'app=None' if loaded_app is None else 'app!=None')
         if loaded_app is None:
             return
-        print('Template.updateParams: update params with ',self.params)
         loaded_app.setParams(self.params)
 
 

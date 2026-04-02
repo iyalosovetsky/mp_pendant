@@ -4,12 +4,13 @@ class App(TemplateGcode):
     __version__ = '0.1'
     __slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__shape__','__z']
     
+    
     diameter:float = 10.0
-    feed:float = 100.0
+    feed:float = 270.0
     zfeed:float = 10.0
-    toolDiameter:float = 8.0
+    toolDiameter:float = 6.1
     down:float =1.0
-    dz:float = 0.1
+    dz:float = 0.25
     __shape__  = 'circle'
     __z:float = 0.0
     

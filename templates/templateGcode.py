@@ -1,16 +1,16 @@
 class TemplateGcode():
     __version__ = '0.1'
-    #__slots__ = ['diameter','feed','zfeed','toolDiameter','down','dz','__z']
-    __slots__ = ['feed','zfeed','toolDiameter','down','dz','__z']
+    # __slots__ = ['feed','zfeed','toolDiameter','down','dz','__z']
+    __slots__ = ['feed','zfeed','__z']
     
     
     def __init__(self):
         #self.diameter:float = 10.0
         self.feed:float = 200.0
         self.zfeed:float = 10.0
-        self.toolDiameter:float = 6.0
-        self.down:float =10.0
-        self.dz:float = 0.4
+        # self.toolDiameter:float = 6.0
+        # self.down:float =10.0
+        # self.dz:float = 0.4
         self.__z:float = 0.0
         
         
