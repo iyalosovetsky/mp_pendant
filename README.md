@@ -39,5 +39,14 @@ nanoguidlib https://github.com/peterhinch/micropython-nano-gui (modified)
 model <img width="1417" height="872" alt="image" src="https://github.com/user-attachments/assets/0e6743ba-c240-4aba-8671-4d6309fccfcc" />
 
 
+Home screen <img width="702" height="1283" alt="image" src="https://github.com/user-attachments/assets/0f5cd5ff-1948-486f-bbdf-80bd15951706" />
+
+
+Template screen <img width="661" height="1205" alt="image" src="https://github.com/user-attachments/assets/f724ca05-0a46-4eb8-a02b-bc50b70b5edd" />
+
+
+
+
+
 
 youtube https://www.youtube.com/shorts/EfERpko-Jbs
