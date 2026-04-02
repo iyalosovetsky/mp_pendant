@@ -1,4 +1,6 @@
-smart pendant for grblHAL by mictopython rp2040.
+smart pendant for grblHAL by mictopython rp2350 (raspberry pico 2w).
+
+It can load and execute templates.
 
 
 Project used LCD bigtreetech TFT35 SPI https://github.com/bigtreetech/TFT35-SPI/tree/master/v2
