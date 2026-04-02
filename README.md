@@ -11,7 +11,13 @@ Parts:
 
  [datasheet](https://datasheets.raspberrypi.com/picow/pico-2-w-datasheet.pdf) 
 
-2.LCD bigtreetech TFT35 SPI https://github.com/bigtreetech/TFT35-SPI/tree/master/v2
+2.LCD bigtreetech TFT35 SPI 
+
+[![Raspberry Pico 2 W](https://biqu.equipment/cdn/shop/products/04_94ff3eb3-2ca5-47ee-adda-5ccce0397c46.png?v=1716343264&width=1220)]
+
+
+
+https://github.com/bigtreetech/TFT35-SPI/tree/master/v2
 
 https://biqu.equipment/products/bigtreetech-tft35-spi-v2-1-touchscreen-io2can-module?_pos=1&_psq=bigtreetech%2FTFT35-SPI&_ss=e&_v=1.0
 
